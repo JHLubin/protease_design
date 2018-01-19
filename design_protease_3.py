@@ -13,8 +13,8 @@ from pyrosetta.rosetta.core.kinematics import FoldTree
 from pyrosetta.rosetta.core.select.residue_selector import \
 	AndResidueSelector, ChainSelector, InterGroupInterfaceByVectorSelector,\
 	NeighborhoodResidueSelector, NotResidueSelector, ResidueIndexSelector
-from pyrosetta.rosetta.core.pack.task import \
-	OperateOnResidueSubset, parse_resfile, TaskFactory
+from pyrosetta.rosetta.core.pack.task import parse_resfile, TaskFactory
+from pyrosetta.rosetta.core.pack.task.operation import OperateOnResidueSubset
 from pyrosetta.rosetta.numeric import xyzVector_double_t
 from pyrosetta.rosetta.protocols.enzdes import ADD_NEW, AddOrRemoveMatchCsts
 from pyrosetta.rosetta.protocols.flexpep_docking import FlexPepDockingProtocol
@@ -157,7 +157,7 @@ def packable_residues_selector(mutable_selector):
 	rs.nearby_atom_cut(4)
 	rs.vector_dist_cut(4)
 	rs.group1_selector(NotResidueSelector(mutable_selector))
-	rs.group1_selector(mutable_selector)
+	rs.group2_selector(mutable_selector)
 
 	# Setting up exclusion of catalytic and mutable residues
 	limit_selection = AndResidueSelector()
@@ -175,7 +175,7 @@ def selector_to_list(pose, selector):
 	selection_list = []
 	for i in range(len(selection_vector)): 
 		if selection_vector[i+1]==1:
-			selection_list.append[i+1]
+			selection_list.append(i+1)
 
 	return selection_list
 
