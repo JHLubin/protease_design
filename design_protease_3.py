@@ -574,7 +574,7 @@ def main():
 
 	# Doing design on threaded models
 	for struc in t_structs:
-		set_design(struc, sf, pep_res, des_res, near_res, 2, args.resfile, tf)
+		set_design(struc, sf, pep_res, des_res, near_res, 10, args.resfile, tf)
 
 
 if __name__ == '__main__':
