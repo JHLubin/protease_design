@@ -2,13 +2,13 @@ color cyan
 select protease, chain A
 select peptide, chain B
 color yellow, peptide
-select cat_res, res 72+154
+select cat_res, res 72+96+154
 color magenta, cat_res
 load a_to_s_ly104_WT.pdb
 color green, a_to_s_ly104_WT
 util.cnc
 select des_res, res 55-58+70+73+150-153+155+170-175
-select shell_res, 52+59+71+74+147-149+169+176-179+181-183
+select shell_res, res 52+59+71+74+147-149+169+176-179+181-183
 select a55, res 55
 select q56, res 56
 select t57, res 57

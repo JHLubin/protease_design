@@ -9,7 +9,12 @@ from os import makedirs
 from os.path import basename, isdir, join
 from pyrosetta import *
 from pyrosetta.rosetta import *
-from pyrosetta.rosetta.core.pack.task import parse_resfile
+from pyrosetta.rosetta.core.kinematics import FoldTree
+from pyrosetta.rosetta.core.select.residue_selector import \
+	AndResidueSelector, ChainSelector, InterGroupInterfaceByVectorSelector,\
+	NeighborhoodResidueSelector, NotResidueSelector, ResidueIndexSelector
+from pyrosetta.rosetta.core.pack.task import \
+	OperateOnResidueSubset, parse_resfile, TaskFactory
 from pyrosetta.rosetta.numeric import xyzVector_double_t
 from pyrosetta.rosetta.protocols.enzdes import ADD_NEW, AddOrRemoveMatchCsts
 from pyrosetta.rosetta.protocols.flexpep_docking import FlexPepDockingProtocol
@@ -29,9 +34,9 @@ def parse_args():
 	parser.add_argument("-useq", "--uncut_peptide_sequence", type=str, 
 		action='append', help="List uncleaved peptide sequences or provide \
 		list file")
-	parser.add_argument("-cr", "--cat_res", type=str, nargs='+', 
-		default=[72, 154], help="The catalytic residues of the protease, \
-		excluded from design (defaults are 72 and 154, for HCV)")
+	parser.add_argument("-cr", "--cat_res", type=int, nargs='+', 
+		default=[72, 96, 154], help="The catalytic residues of the protease, \
+		excluded from design (defaults are 72, 96, and 154, for HCV)")
 	parser.add_argument("-cons", "--constraints", type=str, 
 		default='ly104.cst', help="Pick constraints file")
 	parser.add_argument("-rad", "--design_rad", type=int, default=8, 
@@ -116,6 +121,63 @@ def res_to_design(pdb, radius=8, exclude_res=[72, 154]):
 					break
 
 	return mutable_residues  
+
+
+def mutable_residues_selector():
+	"""
+	Selects the residues in a shell around the peptide using the 
+	InterGroupInterfaceByVectorSelector residue selector
+	Presently hard coded for HCV protease.
+	Decided to design just around peptide, not pep + cat
+	"""
+	# Making positive residue selector
+	rs = InterGroupInterfaceByVectorSelector()
+	rs.group1_selector(ChainSelector("A")) # Protease
+	rs.group2_selector(ChainSelector("B")) # Peptide
+	rs.nearby_atom_cut(6)
+	rs.vector_dist_cut(8)
+
+	# Setting up exclusion of catalytic and peptide residues
+	limit_selection = AndResidueSelector()
+	not_cat = NotResidueSelector(ResidueIndexSelector('72,96,154')) # Catalytic
+	limit_selection.add_residue_selector(not_cat)
+	limit_selection.add_residue_selector(ChainSelector("A")) # Exclude peptide
+	limit_selection.add_residue_selector(rs)
+
+	return limit_selection
+
+
+def packable_residues_selector(mutable_selector):
+	"""
+	Selects the shell of neighbor residues to repack
+	Presently hard coded for HCV protease.
+	"""
+	# Making positive residue selector
+	rs = InterGroupInterfaceByVectorSelector()
+	rs.nearby_atom_cut(4)
+	rs.vector_dist_cut(4)
+	rs.group1_selector(NotResidueSelector(mutable_selector))
+	rs.group1_selector(mutable_selector)
+
+	# Setting up exclusion of catalytic and mutable residues
+	limit_selection = AndResidueSelector()
+	not_cat = NotResidueSelector(ResidueIndexSelector('72,96,154')) # Catalytic
+	limit_selection.add_residue_selector(not_cat)
+	limit_selection.add_residue_selector(rs)
+	limit_selection.add_residue_selector(NotResidueSelector(mutable_selector))
+
+	return limit_selection
+
+
+def selector_to_list(pose, selector):
+	""" Converts a selector output vector to a list of selected residues """
+	selection_vector = selector.apply(pose)
+	selection_list = []
+	for i in range(len(selection_vector)): 
+		if selection_vector[i+1]==1:
+			selection_list.append[i+1]
+
+	return selection_list
 
 
 def get_seq_list(seq_arg):
@@ -203,6 +265,23 @@ def make_move_map(near_res, pep_start=197, pep_end=208):
 		mm.set_chi(i, True)
 	
 	return mm
+
+
+def make_fold_tree():
+	"""
+	Make a fold tree that connects the first catalytic residue to the upstream
+	cleaved residue.
+	Presently hard-coded for HCV protease
+	"""
+	ft = FoldTree()
+	ft.add_edge(72, 1, -1)
+	ft.add_edge(72, 196, -1)
+	ft.add_edge(72, 203, 1)
+	ft.add_edge(203 ,197, -1)
+	ft.add_edge(203 ,207, -1)
+	assert ft.check_fold_tree()
+
+	return ft
 
 
 def make_pack_task(pose, resfile=None, pack_res=[]):
@@ -348,7 +427,10 @@ def set_design(pdb, sf, pep_res, des_res, near_res, num_decoys, resfile):
 	relax, the peptide backbone is flexible, and constraints are applied.
 	"""
 	pose = apply_constraints(pose_from_pdb(pdb))
-	mm = make_move_map(des_res + near_res) # for relax and minimization
+	ft = make_fold_tree()
+	pose.fold_tree(ft)
+	#mm = make_move_map(des_res + near_res) # for relax and minimization
+	mm = make_move_map(near_res) # for relax and minimization
 
 	dec_name = pdb.replace('.pdb.gz', '_designed')
 	jd = PyJobDistributor(dec_name, num_decoys, sf)
@@ -401,6 +483,7 @@ def main():
 
 	# Destination folder for PDB files
 	pdb = args.start_struct
+	source_pose = pose_from_pdb(pdb)
 	dir_nam = args.out_dir
 	if not isdir(dir_nam):
 		makedirs(dir_nam)
@@ -409,21 +492,34 @@ def main():
 	cut_seq = get_seq_list(args.cut_peptide_sequence)
 	uncut_seq = get_seq_list(args.uncut_peptide_sequence)
 
-	# Determining peptide part of PDB file, residues near peptide
-	pep_res = range(197,208)
-	in_shell = args.design_rad
-	out_shell = in_shell + 2
-	cat_res = args.cat_res
-	des_res = res_to_design(pdb, radius=in_shell, exclude_res=cat_res)
-	inner_res = des_res+cat_res
-	near_res = res_to_design(pdb, radius=out_shell, exclude_res=inner_res)
-
 	# Creating threaded structures
 	make = False
 	if args.thread:
 		make = True
 	t_structs = quick_thread(dir_nam, pdb, cut_seq, cleaved=True, make=make)
 	t_structs += quick_thread(dir_nam, pdb, uncut_seq, make=make)
+
+	# Determining peptide part of PDB file, residues near peptide
+	pep_res = range(197,208) # Hard code for HCV protease, should update args
+	in_shell = args.design_rad
+	out_shell = in_shell + 2 # Hard coded 2A, should make a new arg
+	cat_res = args.cat_res # Default is for HCV protease
+	#des_res = res_to_design(pdb, radius=in_shell, exclude_res=cat_res)
+	#inner_res = des_res+cat_res
+	#near_res = res_to_design(pdb, radius=out_shell, exclude_res=inner_res)
+
+	# Making residue selectors
+	cat_res_selector = ResidueIndexSelector('72,96,154')
+	mut_res_selector = mutable_residues_selector()
+	pac_res_selector = packable_residues_selector(mut_res_selector)
+
+	# Converting selectors to lists
+	pose = pose_from_pdb(pdb)
+	des_res = selector_to_list(pose, mut_res_selector)
+	print des_res
+	near_res = selector_to_list(pose, pac_res_selector)
+	print near_res
+	exit
 
 	# Doing design on threaded models
 	for struc in t_structs:
