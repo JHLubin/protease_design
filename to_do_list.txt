@@ -1,0 +1,56 @@
+To Do
+	Update design protocol
+		Design both protease and peptide
+		Different sampling protocols
+			Original manual loop
+			FastDesign
+			FlexPepDock
+			Backrub
+			Others?
+		Adjust residue selection
+			Ignore prime region of peptide
+			Differential selection based on side chain length?
+		What's up with residue scores?
+		Improve output
+			Aggregate mutation info across all models vs mutations specific to peptides
+				Common vs rare vs situational
+				Connection between mutation and specific residue in peptide sequence?
+				Look at residue type, not just letter
+			Combine current scripts
+			Collect residue mutation propensity
+			Change mutations output to make columns match, separate start/end/energy change 
+			Change names to just mutable peptide sequence
+		Increase decoy count
+
+	From viewed AEPDIR_1
+		Back-convert res 56 to Q
+		V93 to glutamate when AEPDI<b>R</b>
+			Run a few models to see how that goes
+		Glutamate --> lysine was good
+		D183K was good w/ asp 4 of peptide
+		Lysine on prime side doesn't matter
+
+	Find cannonical (HCV) sequences in Manasi'd paper (4?)
+		Charge before CS?
+
+	Review 2-side (prot + pep) deisgns
+		How does FastDesign compare with earlier protocol
+			Space of mutations, energies, etc.
+
+Backburner:
+	Fix up MFPred
+
+Ideas
+	Test full cut/uncut list w/base HCV protease, search for correlation patterns with extracted data. Sort of like Manasi's paper.
+		Total score
+		ddG
+		Interface residue scores
+		Interface residue pair-scores
+		Scaling by residue mutation propensity?
+	Getting a sense of cleavage efficiency for known cleaved, vs. different Rosetta scores
+
+Literature to seek
+	* HTRA protease--has PDZ and protease
+		How to model two-domain + substrate in near-attack
+	* Compare a-synuclein and tau papers 
+	Neurosin or cathepsin expression
