@@ -42,11 +42,10 @@ def parse_args():
 		excluded from design (defaults are 72, 96, and 154, for HCV)")
 	parser.add_argument("-cons", "--constraints", type=str, 
 		default='ly104.cst', help="Pick constraints file")
-	parser.add_argument("-rad", "--design_rad", type=int, default=8, 
-		help="Cutoff for designable residues (Angstroms from peptide, \
-		default is 8A)")
 	parser.add_argument("-res", "--resfile", type=str,
 		help="Pick resfile for design")
+	parser.add_argument("-des_pep", "--design_peptide", action = "store_true", 
+		help="Option to allow design on the regognition region of the peptide")
 	parser.add_argument("-th", "--thread", action = "store_true", 
 		help="Option to create threaded models. Use the first time running.")
 	args = parser.parse_args()
@@ -55,8 +54,7 @@ def parse_args():
 
 def init_opts(cst_file='ly104.cst'):
 	""" Produces a list of init options for PyRosetta, including cst file """
-	ros_opts = '-mute core -mute protocols -mute basic'
-	ros_opts += ' -enzdes::cstfile ' + cst_file
+	ros_opts = '-mute all -enzdes::cstfile ' + cst_file
 	ros_opts += ' -cst_fa_weight 1.0 -run:preserve_header -out:pdb_gz'
 	return ros_opts
 
@@ -126,17 +124,6 @@ def res_to_design(pdb, radius=8, exclude_res=[72, 154]):
 	return mutable_residues  
 
 
-def selector_to_list(pose, selector):
-	""" Converts a selector output vector to a list of selected residues """
-	selection_vector = selector.apply(pose)
-	selection_list = []
-	for i in range(len(selection_vector)): 
-		if selection_vector[i+1]==1:
-			selection_list.append(i+1)
-
-	return selection_list
-
-
 def get_seq_list(seq_arg):
 	"""
 	Takes an argument that can include individual peptide sequences or file(s)
@@ -171,16 +158,13 @@ def thread_seq(pose, pep_start, pep_length, seq):
 	return pose
 
 
-def quick_thread(destination, pdb, sequences, cleaved=False, make=False):
+def quick_thread(destination, pose, sequences, cleaved=False, make=False):
 	""" 
 	Threads a set of sequences onto the peptide portion of the given PDB file,
 	outputting a threaded PDB file for each sequence.
 	Function is presently hard-coded for this application.
 	"""
-	pose = pose_from_pdb(pdb)
-
 	thread_files = []
-
 	for seq in sequences:
 		# Naming model
 		if cleaved:
@@ -200,28 +184,42 @@ def quick_thread(destination, pdb, sequences, cleaved=False, make=False):
 	return thread_files
 
 
-def mutable_residues_selector():
+def mutable_residues_selector(design_peptide=False):
 	"""
 	Selects the residues in a shell around the peptide using the 
 	InterGroupInterfaceByVectorSelector residue selector
 	Presently hard coded for HCV protease.
-	Decided to design just around peptide, not pep + cat
+	Decided to design just around peptide, not pep + cat, and only the
+	six mutable residues in the peptide.
 	"""
+	# Selecting regions
+	protease = ChainSelector("A")
+	variable_pep_res = ResidueIndexSelector("198-203")
+	catalytic = ResidueIndexSelector('72,96,154')
+
 	# Making positive residue selector
 	rs = InterGroupInterfaceByVectorSelector()
-	rs.group1_selector(ChainSelector("A")) # Protease
-	rs.group2_selector(ChainSelector("B")) # Peptide
+	rs.group1_selector(protease) # Protease
+	rs.group2_selector(variable_pep_res) # Peptide recognition region
 	rs.nearby_atom_cut(6)
 	rs.vector_dist_cut(8)
 
-	# Setting up exclusion of catalytic and peptide residues
+	# Excluding the catalytic residues
 	limit_selection = AndResidueSelector()
-	not_cat = NotResidueSelector(ResidueIndexSelector('72,96,154')) # Catalytic
-	limit_selection.add_residue_selector(not_cat)
-	limit_selection.add_residue_selector(ChainSelector("A")) # Exclude peptide
+	limit_selection.add_residue_selector(NotResidueSelector(catalytic))
 	limit_selection.add_residue_selector(rs)
 
-	return limit_selection
+	# If the peptide sequence is mutable
+	if design_peptide:
+		return limit_selection
+
+	# If only the protease is designable
+	else: 
+		# Setting up exclusion of catalytic and peptide residues
+		exclusive_selection = AndResidueSelector()
+		exclusive_selection.add_residue_selector(limit_selection)
+		exclusive_selection.add_residue_selector(ChainSelector("A"))
+		return exclusive_selection
 
 
 def packable_residues_selector(mutable_selector):
@@ -229,37 +227,57 @@ def packable_residues_selector(mutable_selector):
 	Selects the shell of neighbor residues to repack
 	Presently hard coded for HCV protease.
 	"""
+	# Selecting regions
+	mutable = mutable_selector
+	not_mutable = NotResidueSelector(mutable_selector)
+	catalytic = ResidueIndexSelector('72,96,154')
+	peptide = ChainSelector('B')
+
+	pep_not_mutable = AndResidueSelector()
+	pep_not_mutable.add_residue_selector(peptide)
+	pep_not_mutable.add_residue_selector(not_mutable)
+
 	# Making positive residue selector
 	rs = InterGroupInterfaceByVectorSelector()
+	rs.group1_selector(not_mutable)
+	rs.group2_selector(mutable)
 	rs.nearby_atom_cut(4)
 	rs.vector_dist_cut(4)
-	rs.group1_selector(NotResidueSelector(mutable_selector))
-	rs.group2_selector(mutable_selector)
 
 	# Setting up exclusion of catalytic and mutable residues
 	limit_selection = AndResidueSelector()
-	not_cat = NotResidueSelector(ResidueIndexSelector('72,96,154')) # Catalytic
-	limit_selection.add_residue_selector(not_cat)
+	limit_selection.add_residue_selector(NotResidueSelector(catalytic))
 	limit_selection.add_residue_selector(rs)
-	limit_selection.add_residue_selector(NotResidueSelector(mutable_selector))
+	limit_selection.add_residue_selector(not_mutable)
 
 	# Add back in the peptide
 	expand_selection = OrResidueSelector()
 	expand_selection.add_residue_selector(limit_selection)
-	expand_selection.add_residue_selector(ChainSelector("B"))
+	expand_selection.add_residue_selector(pep_not_mutable)
 
 	return expand_selection
 
 
 def other_residues_selector(mutable_selector, packable_selector):
 	""" Selects the residues that are not designable or repackable """
-	all_rel_res_sel = OrResidueSelector()
-	all_rel_res_sel.add_residue_selector(mutable_selector)
-	all_rel_res_sel.add_residue_selector(packable_selector)
+	all_mobile_res = OrResidueSelector()
+	all_mobile_res.add_residue_selector(mutable_selector)
+	all_mobile_res.add_residue_selector(packable_selector)
 
-	other_res_selector = NotResidueSelector(all_rel_res_sel)
+	other_res_selector = NotResidueSelector(all_mobile_res)
 
 	return other_res_selector
+
+
+def selector_to_list(pose, selector):
+	""" Converts a selector output vector to a list of selected residues """
+	selection_vector = selector.apply(pose)
+	selection_list = []
+	for i in range(len(selection_vector)): 
+		if selection_vector[i+1]==1:
+			selection_list.append(i+1)
+
+	return selection_list
 
 
 def apply_constraints(pose):
@@ -529,8 +547,7 @@ def main():
 	sf = create_score_function('ref2015_cst')
 
 	# Destination folder for PDB files
-	pdb = args.start_struct
-	source_pose = pose_from_pdb(pdb)
+	pose = pose_from_pdb(pose)
 	dir_nam = args.out_dir
 	if not isdir(dir_nam):
 		makedirs(dir_nam)
@@ -543,27 +560,19 @@ def main():
 	make = False
 	if args.thread:
 		make = True
-	t_structs = quick_thread(dir_nam, pdb, cut_seq, cleaved=True, make=make)
-	t_structs += quick_thread(dir_nam, pdb, uncut_seq, make=make)
-
-	# Determining peptide part of PDB file, residues near peptide
-	pep_res = range(197,208) # Hard code for HCV protease, should update args
-	in_shell = args.design_rad
-	out_shell = in_shell + 2 # Hard coded 2A, should make a new arg
-	cat_res = args.cat_res # Default is for HCV protease
-	#des_res = res_to_design(pdb, radius=in_shell, exclude_res=cat_res)
-	#inner_res = des_res+cat_res
-	#near_res = res_to_design(pdb, radius=out_shell, exclude_res=inner_res)
+	t_structs = quick_thread(dir_nam, pose, cut_seq, cleaved=True, make=make)
+	t_structs += quick_thread(dir_nam, pose, uncut_seq, make=make)
 
 	# Making residue selectors
 	cat_res_selector = ResidueIndexSelector('72,96,154')
-	mut_res_selector = mutable_residues_selector()
+	pep_res_selector = ChainSelector("B")
+	mut_res_selector = mutable_residues_selector(args.design_peptide)
 	pac_res_selector = packable_residues_selector(mut_res_selector)
 	oth_res_selector = other_residues_selector(mut_res_selector, 
 												pac_res_selector)
 
 	# Converting selectors to lists
-	pose = pose_from_pdb(pdb)
+	pep_res = selector_to_list(pose, pep_res_selector)
 	des_res = selector_to_list(pose, mut_res_selector)
 	near_res = selector_to_list(pose, pac_res_selector)
 	other_res = selector_to_list(pose, oth_res_selector)
