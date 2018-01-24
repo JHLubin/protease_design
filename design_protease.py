@@ -22,7 +22,6 @@ from pyrosetta.rosetta.protocols.enzdes import ADD_NEW, AddOrRemoveMatchCsts
 from pyrosetta.rosetta.protocols.flexpep_docking import FlexPepDockingProtocol
 from pyrosetta.rosetta.protocols.relax import FastRelax
 from pyrosetta.teaching import MinMover, PackRotamersMover, SimpleThreadingMover
-import sys
 
 def parse_args():
 	info = "Design a protease around a peptide sequence"
@@ -32,22 +31,25 @@ def parse_args():
 	parser.add_argument("-od", "--out_dir", required=True,
 		help="Name an output directory for decoys")
 	parser.add_argument("-cseq", "--cut_peptide_sequence", type=str, 
-		action='append', help="List cleaved peptide sequences or provide \
-		list file")
+		action='append', default=[], help="List cleaved peptide sequences or \
+		 provide a list file")
 	parser.add_argument("-useq", "--uncut_peptide_sequence", type=str, 
-		action='append', help="List uncleaved peptide sequences or provide \
-		list file")
+		action='append', default=[], help="List uncleaved peptide sequences \
+		or provide a list file")
 	parser.add_argument("-cr", "--cat_res", type=int, nargs='+', 
 		default=[72, 96, 154], help="The catalytic residues of the protease, \
 		excluded from design (defaults are 72, 96, and 154, for HCV)")
 	parser.add_argument("-cons", "--constraints", type=str, 
 		default='ly104.cst', help="Pick constraints file")
-	parser.add_argument("-res", "--resfile", type=str,
-		help="Pick resfile for design")
 	parser.add_argument("-des_pep", "--design_peptide", action = "store_true", 
 		help="Option to allow design on the regognition region of the peptide")
-	parser.add_argument("-th", "--thread", action = "store_true", 
+	parser.add_argument("-th", "--thread", action="store_true", default=False,
 		help="Option to create threaded models. Use the first time running.")
+	parser.add_argument("-d", "--number_decoys", type=int, default=10, 
+		help="How many decoys should be made? (Default is 10.)")
+	parser.add_argument("-m", "--method", type=str, default='fastdesign', 
+		choices=['fastdesign', 'custom'],
+		help="What design protocol do you want to use?")
 	args = parser.parse_args()
 	return args
 
@@ -58,7 +60,529 @@ def init_opts(cst_file='ly104.cst'):
 	ros_opts += ' -cst_fa_weight 1.0 -run:preserve_header -out:pdb_gz'
 	return ros_opts
 
+######### Threading and getting sequences ####################################
+def get_seq_list(seq_arg):
+	"""
+	Takes an argument that can include individual peptide sequences or file(s)
+	containing a list of sequences, and returns a list of sequences. 
+	Distinguishes between files and sequences by the presence of a dot (.).
+	"""
+	pep_sequences = []
+	for inp in seq_arg:
+		if '.' in inp:
+			# If input is a file
+			with open(inp, 'r') as t:
+				lis = t.readlines()
+			if len(lis) == 1:
+				# If all sequences are listed horizontally on one line
+				# rather than one per line, rearrange
+				lis = lis[0].split()
 
+			for i in lis:
+				pep_sequences.append(i.strip())
+
+		else:
+			# Sequence was typed directly into the argument
+			pep_sequences.append(inp.strip())
+
+	return pep_sequences
+
+
+def quick_thread(destination, pose, sequences, cleaved=False, make=False):
+	""" 
+	Threads a set of sequences onto the peptide portion of the given PDB file,
+	outputting a threaded PDB file for each sequence.
+	Function is presently hard-coded for this application.
+	"""
+	thread_files = []
+	for seq in sequences:
+		# Naming model
+		pdbname = 'cleaved_ly104_wt_' + seq + '.pdb.gz'
+		if not cleaved:
+			pdbname = 'un' + pdbname
+
+		out_name = join(destination, pdbname)
+		thread_files.append(out_name)
+
+		if make:
+			# Threading peptide sequences
+			tm = SimpleThreadingMover(seq, 197)
+			threaded_pose = Pose()
+			threaded_pose.assign(pose)
+			tm.apply(threaded_pose)
+			threaded_pose.dump_pdb(out_name)
+
+	return thread_files
+
+######### Residue selection ##################################################
+def mutable_residues_selector(design_peptide=False):
+	"""
+	Selects the residues in a shell around the peptide using the 
+	InterGroupInterfaceByVectorSelector residue selector
+	Presently hard coded for HCV protease.
+	Decided to design just around peptide, not pep + cat, and only the
+	six mutable residues in the peptide.
+	"""
+	# Selecting regions
+	protease = ChainSelector("A")
+	variable_pep_res = ResidueIndexSelector("198-203")
+	catalytic = ResidueIndexSelector('72,96,154')
+
+	# Making positive residue selector
+	rs = InterGroupInterfaceByVectorSelector()
+	rs.group1_selector(protease) # Protease
+	rs.group2_selector(variable_pep_res) # Peptide recognition region
+	rs.nearby_atom_cut(6)
+	rs.vector_dist_cut(8)
+
+	# Excluding the catalytic residues
+	limit_selection = AndResidueSelector()
+	limit_selection.add_residue_selector(NotResidueSelector(catalytic))
+	limit_selection.add_residue_selector(rs)
+
+	# If the peptide sequence is mutable
+	if design_peptide:
+		return limit_selection
+
+	# If only the protease is designable
+	else: 
+		# Setting up exclusion of catalytic and peptide residues
+		exclusive_selection = AndResidueSelector()
+		exclusive_selection.add_residue_selector(limit_selection)
+		exclusive_selection.add_residue_selector(ChainSelector("A"))
+		return exclusive_selection
+
+
+def packable_residues_selector(mutable_selector):
+	"""
+	Selects the shell of neighbor residues to repack
+	Presently hard coded for HCV protease.
+	"""
+	# Selecting regions
+	mutable = mutable_selector
+	not_mutable = NotResidueSelector(mutable_selector)
+	catalytic = ResidueIndexSelector('72,96,154')
+	peptide = ChainSelector('B')
+
+	pep_not_mutable = AndResidueSelector()
+	pep_not_mutable.add_residue_selector(peptide)
+	pep_not_mutable.add_residue_selector(not_mutable)
+
+	# Selecting residues near mutable shell
+	near_mutable = InterGroupInterfaceByVectorSelector()
+	near_mutable.group1_selector(not_mutable)
+	near_mutable.group2_selector(mutable)
+	near_mutable.nearby_atom_cut(4)
+	near_mutable.vector_dist_cut(4)
+
+	# Selecting residues near the peptide
+	near_pep = InterGroupInterfaceByVectorSelector()
+	near_pep.group1_selector(not_mutable) # Protease
+	near_pep.group2_selector(peptide) # Peptide recognition region
+	near_pep.nearby_atom_cut(10)
+	near_pep.vector_dist_cut(12)
+
+	# Combining selections for near peptide and near mutable residues
+	wide_set = OrResidueSelector()
+	wide_set.add_residue_selector(near_mutable)
+	wide_set.add_residue_selector(near_pep)	
+
+	# Setting up exclusion of catalytic and mutable residues
+	limit_selection = AndResidueSelector()
+	limit_selection.add_residue_selector(NotResidueSelector(catalytic))
+	limit_selection.add_residue_selector(wide_set)
+	limit_selection.add_residue_selector(not_mutable)
+
+	# Add back in the peptide
+	expand_selection = OrResidueSelector()
+	expand_selection.add_residue_selector(limit_selection)
+	expand_selection.add_residue_selector(pep_not_mutable)
+
+	return expand_selection
+
+
+def other_residues_selector(mutable_selector, packable_selector):
+	""" Selects the residues that are not designable or repackable """
+	all_mobile_res = OrResidueSelector()
+	all_mobile_res.add_residue_selector(mutable_selector)
+	all_mobile_res.add_residue_selector(packable_selector)
+
+	other_res_selector = NotResidueSelector(all_mobile_res)
+
+	return other_res_selector
+
+
+def select_residues(design_peptide=False):
+	""" Makes residue selectors for HCV protease sections """
+	residue_selectors = {}
+	residue_selectors['catalytic'] = ResidueIndexSelector('72,96,154')
+	residue_selectors['peptide'] = ChainSelector("B")
+	residue_selectors['mutable'] = mutable_residues_selector(design_peptide)
+	residue_selectors['packable'] = \
+		packable_residues_selector(residue_selectors['mutable'])
+	residue_selectors['other'] = \
+		other_residues_selector(residue_selectors['mutable'], 
+								residue_selectors['packable'])
+
+	return residue_selectors
+
+
+def selector_to_list(pose, selector):
+	""" Converts a selector output vector to a list of selected residues """
+	selection_vector = selector.apply(pose)
+	selection_list = []
+	for i in range(len(selection_vector)): 
+		if selection_vector[i+1]==1:
+			selection_list.append(i+1)
+
+	return selection_list
+
+
+def make_residue_lists(pose, residue_selectors):
+	""" 
+	Converts a dict of selectors to a list of selected residues for a pose 
+	"""
+	residue_lists = {}
+	residue_lists['catalytic'] = \
+		selector_to_list(pose, residue_selectors['catalytic'])
+	residue_lists['peptide'] = \
+		selector_to_list(pose, residue_selectors['peptide'])
+	residue_lists['mutable'] = \
+		selector_to_list(pose, residue_selectors['mutable'])
+	residue_lists['packable'] = \
+		selector_to_list(pose, residue_selectors['packable'])
+	residue_lists['other'] = \
+		selector_to_list(pose, residue_selectors['other'])
+
+	return residue_lists
+
+######### Design #############################################################
+def apply_constraints(pose):
+	""" Applies the constraints form the input CST file to a pose """
+	cstm = AddOrRemoveMatchCsts()
+	cstm.set_cst_action(ADD_NEW)
+	cstm.apply(pose)
+	return pose
+
+
+def make_fold_tree():
+	"""
+	Make a fold tree that connects the first catalytic residue to the upstream
+	cleaved residue.
+	Presently hard-coded for HCV protease
+	"""
+	ft = FoldTree()
+	ft.add_edge(72, 1, -1)
+	ft.add_edge(72, 196, -1)
+	ft.add_edge(72, 203, 1)
+	ft.add_edge(203 ,197, -1)
+	ft.add_edge(203 ,207, -1)
+	assert ft.check_fold_tree()
+
+	return ft
+
+
+def make_move_map(pose, residue_lists):
+	""" 
+	Makes a movemap for a protease-peptide system, with all non-peptide 
+	residue backbones fixed, and side chains mobile for the peptide and all
+	residues in an input selection, which is intended to be the nearby  
+	residues, excluding the catalytic ones. 
+	"""
+	# Converting from selection to values
+	peptide_residues = residue_lists['peptide']
+	repackable_residues = peptide_residues + \
+							residue_lists['mutable']+ \
+							residue_lists['packable']
+
+	# Making movemap
+	mm = MoveMap()
+
+	for i in peptide_residues:
+		mm.set_bb(i, True)
+
+	for i in repackable_residues:
+		mm.set_chi(i, True)
+
+	return mm
+
+
+def make_task_factory(residue_selectors):
+	""" 
+	Makes a TaskFactory with operations that leave the mutable residues 
+	designable, restricts the nearby residues to repacking, and prevents 
+	repacking of other residues.
+	"""
+	design_set = residue_selectors['mutable']
+	repack_set = residue_selectors['packable']
+	other_set = residue_selectors['other']
+
+	prevent = PreventRepackingRLT() # No repack, no design
+	restrict = RestrictToRepackingRLT() # No design
+
+	tf = TaskFactory()
+	tf.push_back(OperateOnResidueSubset(prevent, other_set))
+	tf.push_back(OperateOnResidueSubset(restrict, repack_set))
+	# Everything else left designable		
+
+	return tf
+
+
+def fastrelax(pose, score_function, movemap):
+	""" 
+	Runs the FastRelax protocol on a pose, using given score function and 
+	movemap
+	"""
+	relax = FastRelax()
+	relax.set_scorefxn(score_function)
+	relax.set_movemap(movemap)
+
+	relax.apply(pose)
+	return pose
+
+
+def minmover(pose, score_function, movemap):
+	""" 
+	Runs a gradient-base minimization on a pose, using given score function
+	and movemap
+	"""	
+	min_mover = MinMover()
+	min_mover.score_function(score_function)
+	min_mover.movemap(movemap)
+
+	min_mover.apply(pose)
+	return pose	
+
+
+def design_pack(pose, score_function, task):
+	""" Runs packing mover on a pose, using given score function and task """
+	pack = PackRotamersMover(score_function, task)
+	pack.apply(pose)
+	return pose
+
+
+def custom_design(pose, score_function, movemap, taskfactory, cycles):
+	""" Simple design protocol without fa_rep ramping """
+
+	for i in range(cycles):
+		task = taskfactory.create_task_and_apply_taskoperations(pose)
+		pose = design_pack(pose, score_function, task)
+		pose = minmover(pose, score_function, movemap)
+
+	return pose
+
+
+def fastdesign(pose, score_function, movemap, taskfactory):
+	fd = FastDesign()
+	fd.set_scorefxn(score_function)
+	fd.set_movemap(movemap)
+	fd.set_task_factory(taskfactory)
+
+	fd.apply(pose)
+	return pose
+
+######### Evaluation #########################################################
+# Weights from the score function REF_2015
+ref_wts = \
+	{'fa_atr': 1.0, 'fa_rep': 0.55, 'fa_sol': 1.0, 'fa_intra_rep': 0.005, 
+	'fa_intra_sol_xover4': 1.0, 'lk_ball_wtd': 1.0, 'fa_elec': 1.0, 
+	'pro_close': 1.25, 'hbond_sr_bb': 1.0, 'hbond_lr_bb': 1.0, 
+	'hbond_bb_sc': 1.0, 'hbond_sc': 1.0, 'dslf_fa13': 1.25, 
+	'atom_pair_constraint': 1.0, 'coordinate_constraint': 1.0, 
+	'angle_constraint': 1.0,'dihedral_constraint': 1.0, 'omega': 0.4, 
+	'fa_dun': 0.7, 'p_aa_pp': 0.6, 'yhh_planarity': 0.625, 'ref': 1.0, 
+	'chainbreak': 1.0, 'rama_prepro': 0.45, 'res_type_constraint': 1.0}
+
+
+def cleanhead(header):
+	""" 
+	When using pose.energies(), the lengths of some score terms are long 
+	enough that they run into each other. Consequently, the split() method
+	doesn't separate them correctly. This function takes a header line and
+	cleans up any such clashes identified in ref2015_cst. The reason I bother
+	is to accommodate the possibility of cst/no cst, in which case the 
+	indexing of the energies table changes.
+	"""
+	for n, i in enumerate(header):
+		# Cleaning up string length clashes
+		if i == 'fa_intra_repfa_intra_sol_xo':
+			header[n] = 'fa_intra_rep'
+			header.insert(n+1, 'fa_intra_sol_xover4')
+		if i == 'dslf_fa13atom_pair_constcoordinate_consangle_constraindihedral_constr':
+			header[n] = 'dslf_fa13'
+			header.insert(n+1, 'atom_pair_constraint')
+			header.insert(n+2, 'coordinate_constraint')
+			header.insert(n+3, 'angle_constraint')
+			header.insert(n+3, 'dihedral_constraint')
+		if i == 'rama_preprores_type_constr':
+			header[n] = 'rama_prepro'
+			header.insert(n+1, 'res_type_constraint')
+
+	return header
+
+
+def res_scores(pose, residues, score_function):
+	""" Gets the residue scores for a given set of residues in a pose """
+	score_function(pose)
+	pose_energies = str(pose.energies()).split('\n') # Table of residue
+		# score components, including a header line, so index matches res
+
+	# Getting scores header
+	head_raw = pose_energies[0].split()[1:]
+	header = cleanhead(head_raw)
+
+	energies_set = []
+	for i in residues:
+		res_energies = pose_energies[i].split()[1:]
+		res_tot_energy = 0.0
+		for j, term in enumerate(header):
+			res_tot_energy += (float(res_energies[j]) * ref_wts[term])
+		energies_set.append(res_tot_energy)
+
+	set_energy = sum(energies_set)
+	return set_energy, energies_set
+
+
+def move_apart(pose, peptide_start, peptide_end):
+	""" Moves the peptide a long distance away from the protease """
+	# Making displacement vector
+	xyz = xyzVector_double_t()
+	xyz.x, xyz.y, xyz.z = [100 for i in range(3)]
+
+	# Moving peptide, atom by atom
+	for res in range(peptide_start, peptide_end + 1):
+		for atom in range(1, pose.residue(res).natoms() + 1):
+			pose.residue(res).set_xyz(atom, pose.residue(res).xyz(atom) + xyz)
+
+	return pose
+
+
+def score_ddg(pose, tf):
+	"""
+	Gets a score for the ddG of peptide binding to the protease. This is 
+	achieved by taking the peptide and moving each atom a set arbitrary length 
+	that is large enough to be far from the protease, then repacking the side
+	chains of both the peptide and the mutable protease residues. This 
+	function does not take a scorefunction as an input, scoring instead with 
+	the default function to ignore the effects of constraints.
+	"""
+	# Making a new pose to avoid messing up the input
+	ddg_pose = Pose()
+	ddg_pose.assign(pose)
+
+	sf = get_fa_scorefxn()
+
+	# Score when docked
+	dock_score = sf(ddg_pose)
+
+	# Score when separate
+	pt = tf.create_task_and_apply_taskoperations(pose)
+	pt.restrict_to_repacking()
+	ddg_pose = move_apart(ddg_pose, 197, 207)
+	ddg_pose = design_pack(ddg_pose, sf, pt)
+	split_score = sf(ddg_pose)
+
+	ddg = dock_score - split_score
+
+	return [round(i,3) for i in [dock_score, split_score, ddg]]
+
+
+def ident_mutations(start_pose, end_pose, residues, start_set, end_set):
+	"""
+	Compares the sequences of a starting pose and ending pose at specified 
+	residues and identifies differences. Returns a string listing changes in 
+	the format of ANB, where A is the starting residue, N is the residue 
+	number, and B is the ending residue.
+	"""
+	template = '{:6s}{:6s}{:6s}{:12s}'
+	mutations = ''
+	mutations_present = False
+	for i in residues:
+		res_mut_info = [i]
+		start_res = start_pose.residue(i).name1()
+		res_mut_info.append(start_res)
+		end_res = end_pose.residue(i).name1()
+		if start_res != end_res:
+			mutations_present = True
+			res_mut_info.append(end_res)
+
+			r_i = residues.index(i)
+			e_dif = round(end_set[r_i] - start_set[r_i], 3)
+			res_mut_info.append(e_dif)
+
+		else:
+			res_mut_info += ['NO CHANGE', '']
+
+		mutations += template.format(*[str(i) for i in res_mut_info])
+
+	if mutations_present:
+		return mutations.lstrip(',')
+	else:
+		return "NONE"
+
+######### Design and evaluation protocol #####################################
+def set_design(pdb, residue_selectors, num_decoys, method):
+	"""
+	Uses the job distributor to output a set of proteases designed for 
+	compatability with a threaded peptide sequence. Outputs a provided number
+	of decoys into a directory that is also a required input. Will relax the 
+	pdb, then run 20 rounds of design/repacking plus minimization. For all 
+	movers, only the residues in the peptide and those within the input list
+	are repackable, and only those in the input list are designable. For the 
+	relax, the peptide backbone is flexible, and constraints are applied.
+	"""
+	pose = apply_constraints(pose_from_pdb(pdb))
+	residue_lists = make_residue_lists(pose, residue_selectors)
+
+	sf = create_score_function('ref2015_cst')
+	ft = make_fold_tree() # Hard-coded for HCV protease
+	pose.fold_tree(ft) # Improve sampling efficiency
+	mm = make_move_map(pose, residue_lists) # for relax and minimization
+	tf = make_task_factory(residue_selectors)
+
+	dec_name = pdb.replace('.pdb.gz', '_designed')
+	jd = PyJobDistributor(dec_name, num_decoys, sf)
+
+	while not jd.job_complete:
+		pp = Pose()
+		pp.assign(pose)
+		relaxed_struc = Pose()
+
+		# Relaxing
+		print 'relaxing'
+		relax_name = jd.current_name.replace('designed', 'relaxed')
+		pp = fastrelax(pp, sf, mm)
+		relaxed_struc.assign(pp)
+		relaxed_struc.dump_pdb(relax_name)
+
+		# Doing design, default is FastDesign
+		print 'designing'
+		if method == 'custom':
+			pp = custom_design(pp, sf, mm, tf, 5)
+		else:
+			pp = fastdesign(pp, sf, mm, tf)
+
+		# Getting residue scores, ddG, and mutations list
+		rel_pro_set = res_scores(relaxed_struc, residue_lists['mutable'], sf)[1]
+		rel_pep_set = res_scores(relaxed_struc, residue_lists['peptide'], sf)[1]
+		prot_res_e, pro_re_set = res_scores(pp, residue_lists['mutable'], sf)
+		pep_res_e, pep_re_set = res_scores(pp, residue_lists['peptide'], sf)
+		dock_split_ddg = score_ddg(pp, tf)
+		pro_mut = ident_mutations(pose, pp, residue_lists['mutable'], rel_pro_set, pro_re_set)
+		pep_mut = ident_mutations(pose, pp, residue_lists['peptide'], rel_pep_set, pep_re_set)
+
+		# Making line to add to fasc file
+		scores = [prot_res_e, pep_res_e] + dock_split_ddg + [pro_mut, pep_mut]
+		temp = "protease_res_scores: {}   peptide_res_scores: {}   "
+		temp += "docked_score: {}   split_score: {}   ddG: {}   "
+		temp += "prot_mutations: {}   pep_mutations: {}"
+		score_text = temp.format(*[str(i) for i in scores])
+		print score_text, '\n'
+		jd.additional_decoy_info = score_text
+
+		jd.output_decoy(pp)
+
+######### DEPRACATED #########################################################
 def res_ca_cords(pose, res):
 	""" Returns the x,y,z coordinates of the A-carbon of a given residue"""
 	res_coords = []
@@ -124,220 +648,6 @@ def res_to_design(pdb, radius=8, exclude_res=[72, 154]):
 	return mutable_residues  
 
 
-def get_seq_list(seq_arg):
-	"""
-	Takes an argument that can include individual peptide sequences or file(s)
-	containing a list of sequences, and returns a list of sequences. 
-	Distinguishes between files and sequences by the presence of a dot (.).
-	"""
-	pep_sequences = []
-	for inp in seq_arg:
-		if '.' in inp:
-			# If input is a file
-			with open(inp, 'r') as t:
-				lis = t.readlines()
-			if len(lis) == 1:
-				# If all sequences are listed horizontally on one line
-				# rather than one per line, rearrange
-				lis = lis[0].split()
-
-			for i in lis:
-				pep_sequences.append(i.strip())
-
-		else:
-			# Sequence was typed directly into the argument
-			pep_sequences.append(inp.strip())
-
-	return pep_sequences
-		
-
-def thread_seq(pose, pep_start, pep_length, seq):
-	""" Thread a new sequence in for the peptide. """
-	tm = SimpleThreadingMover(seq, pep_start)
-	tm.apply(pose)
-	return pose
-
-
-def quick_thread(destination, pose, sequences, cleaved=False, make=False):
-	""" 
-	Threads a set of sequences onto the peptide portion of the given PDB file,
-	outputting a threaded PDB file for each sequence.
-	Function is presently hard-coded for this application.
-	"""
-	thread_files = []
-	for seq in sequences:
-		# Naming model
-		if cleaved:
-			pdbname = 'cleaved_ly104_wt_' + seq + '.pdb.gz'
-		else:
-			pdbname = 'uncleaved_ly104_wt_' + seq + '.pdb.gz'
-		out_name = join(destination, pdbname)
-		thread_files.append(out_name)
-
-		if make:
-			# Threading peptide sequences
-			threaded_pose = Pose()
-			threaded_pose.assign(pose)
-			threaded_pose = thread_seq(threaded_pose, 197, 11, seq)
-			threaded_pose.dump_pdb(out_name)
-
-	return thread_files
-
-
-def mutable_residues_selector(design_peptide=False):
-	"""
-	Selects the residues in a shell around the peptide using the 
-	InterGroupInterfaceByVectorSelector residue selector
-	Presently hard coded for HCV protease.
-	Decided to design just around peptide, not pep + cat, and only the
-	six mutable residues in the peptide.
-	"""
-	# Selecting regions
-	protease = ChainSelector("A")
-	variable_pep_res = ResidueIndexSelector("198-203")
-	catalytic = ResidueIndexSelector('72,96,154')
-
-	# Making positive residue selector
-	rs = InterGroupInterfaceByVectorSelector()
-	rs.group1_selector(protease) # Protease
-	rs.group2_selector(variable_pep_res) # Peptide recognition region
-	rs.nearby_atom_cut(6)
-	rs.vector_dist_cut(8)
-
-	# Excluding the catalytic residues
-	limit_selection = AndResidueSelector()
-	limit_selection.add_residue_selector(NotResidueSelector(catalytic))
-	limit_selection.add_residue_selector(rs)
-
-	# If the peptide sequence is mutable
-	if design_peptide:
-		return limit_selection
-
-	# If only the protease is designable
-	else: 
-		# Setting up exclusion of catalytic and peptide residues
-		exclusive_selection = AndResidueSelector()
-		exclusive_selection.add_residue_selector(limit_selection)
-		exclusive_selection.add_residue_selector(ChainSelector("A"))
-		return exclusive_selection
-
-
-def packable_residues_selector(mutable_selector):
-	"""
-	Selects the shell of neighbor residues to repack
-	Presently hard coded for HCV protease.
-	"""
-	# Selecting regions
-	mutable = mutable_selector
-	not_mutable = NotResidueSelector(mutable_selector)
-	catalytic = ResidueIndexSelector('72,96,154')
-	peptide = ChainSelector('B')
-
-	pep_not_mutable = AndResidueSelector()
-	pep_not_mutable.add_residue_selector(peptide)
-	pep_not_mutable.add_residue_selector(not_mutable)
-
-	# Making positive residue selector
-	rs = InterGroupInterfaceByVectorSelector()
-	rs.group1_selector(not_mutable)
-	rs.group2_selector(mutable)
-	rs.nearby_atom_cut(4)
-	rs.vector_dist_cut(4)
-
-	# Setting up exclusion of catalytic and mutable residues
-	limit_selection = AndResidueSelector()
-	limit_selection.add_residue_selector(NotResidueSelector(catalytic))
-	limit_selection.add_residue_selector(rs)
-	limit_selection.add_residue_selector(not_mutable)
-
-	# Add back in the peptide
-	expand_selection = OrResidueSelector()
-	expand_selection.add_residue_selector(limit_selection)
-	expand_selection.add_residue_selector(pep_not_mutable)
-
-	return expand_selection
-
-
-def other_residues_selector(mutable_selector, packable_selector):
-	""" Selects the residues that are not designable or repackable """
-	all_mobile_res = OrResidueSelector()
-	all_mobile_res.add_residue_selector(mutable_selector)
-	all_mobile_res.add_residue_selector(packable_selector)
-
-	other_res_selector = NotResidueSelector(all_mobile_res)
-
-	return other_res_selector
-
-
-def selector_to_list(pose, selector):
-	""" Converts a selector output vector to a list of selected residues """
-	selection_vector = selector.apply(pose)
-	selection_list = []
-	for i in range(len(selection_vector)): 
-		if selection_vector[i+1]==1:
-			selection_list.append(i+1)
-
-	return selection_list
-
-
-def apply_constraints(pose):
-	""" Applies the constraints form the input CST file to a pose """
-	cstm = AddOrRemoveMatchCsts()
-	cstm.set_cst_action(ADD_NEW)
-	cstm.apply(pose)
-	return pose
-
-
-def make_move_map(near_res, pep_start=197, pep_end=208):
-	""" 
-	Makes a movemap for a protease-peptide system, with all non-peptide 
-	residue backbones fixed, and side chains mobile for the peptide and all
-	residues in an input list, which is intended to be the nearby residues 
-	(8A by default), excluding the catalytic ones. 
-	"""
-	mm = MoveMap()
-	mm.set_bb_true_range(pep_start,pep_end)
-	mm.set_chi_true_range(pep_start,pep_end)
-	for i in near_res:
-		mm.set_chi(i, True)
-	
-	return mm
-
-
-def make_fold_tree():
-	"""
-	Make a fold tree that connects the first catalytic residue to the upstream
-	cleaved residue.
-	Presently hard-coded for HCV protease
-	"""
-	ft = FoldTree()
-	ft.add_edge(72, 1, -1)
-	ft.add_edge(72, 196, -1)
-	ft.add_edge(72, 203, 1)
-	ft.add_edge(203 ,197, -1)
-	ft.add_edge(203 ,207, -1)
-	assert ft.check_fold_tree()
-
-	return ft
-
-
-def make_task_factory(repack_set, other_set):
-	""" 
-	Makes a TaskFactory with operations that leave the mutable residues 
-	designable, restricts the nearby residues to repacking, and prevents 
-	repacking of other residues.
-	"""
-	prevent=PreventRepackingRLT()
-	restrict=RestrictToRepackingRLT()
-
-	tf = TaskFactory()
-	tf.push_back(OperateOnResidueSubset(prevent, other_set))
-	tf.push_back(OperateOnResidueSubset(restrict, repack_set))
-	# Everything else left designable
-
-	return tf
-
-
 def make_pack_task(pose, resfile=None, pack_res=[]):
 	""" 
 	Makes a packer task for a given pose using an input resfile or list of 
@@ -355,186 +665,7 @@ def make_pack_task(pose, resfile=None, pack_res=[]):
 
 	return task
 
-
-def fastrelax(pose, score_function, movemap):
-	""" 
-	Runs the FastRelax protocol on a pose, using given score function and 
-	movemap
-	"""
-	relax = FastRelax()
-	relax.set_scorefxn(score_function)
-	relax.set_movemap(movemap)
-
-	relax.apply(pose)
-	return pose
-
-
-def fastdesign(pose, score_function, movemap, taskfactory):
-	fd = FastDesign()
-	fd.set_scorefxn(score_function)
-	fd.set_movemap(movemap)
-	fd.set_task_factory(taskfactory)
-
-	fd.apply(pose)
-	return pose
-
-
-def minmover(pose, score_function, movemap):
-	""" 
-	Runs a gradient-base minimization on a pose, using given score function
-	and movemap
-	"""	
-	min_mover = MinMover()
-	min_mover.score_function(score_function)
-	min_mover.movemap(movemap)
-
-	min_mover.apply(pose)
-	return pose	
-
-
-def design_pack(pose, score_function, task):
-	""" Runs packing mover on a pose, using given score function and task """
-	pack = PackRotamersMover(score_function, task)
-	pack.apply(pose)
-	return pose
-
-
-def res_scores(pose, residues, score_function):
-	""" Gets the residue scores for a given set of residues in a pose """
-	score_function(pose)
-	pose_energies = str(pose.energies()).split('\n') # Table of residue
-		# score components, including a header line, so index matches res
-	energies_set = []
-	for i in residues:
-		res_energies = pose_energies[i].split()[1:]
-		res_tot_energy = sum([float(j) for j in res_energies])
-		energies_set.append(res_tot_energy)
-
-	set_energy = sum(energies_set)
-	return set_energy, energies_set
-
-
-def move_apart(pose, peptide_start, peptide_end):
-	""" Moves the peptide a long distance away from the protease """
-	# Making displacement vector
-	xyz = xyzVector_double_t()
-	xyz.x, xyz.y, xyz.z = [100 for i in range(3)]
-
-	# Moving peptide, atom by atom
-	for res in range(peptide_start, peptide_end + 1):
-		for atom in range(1, pose.residue(res).natoms() + 1):
-			pose.residue(res).set_xyz(atom, pose.residue(res).xyz(atom) + xyz)
-
-	return pose
-
-
-def score_ddg(pose, near_res):
-	"""
-	Gets a score for the ddG of peptide binding to the protease. This is 
-	achieved by taking the peptide and moving each atom a set arbitrary length 
-	that is large enough to be far from the protease, then repacking the side
-	chains of both the peptide and the mutable protease residues. This 
-	function does not take a scorefunction as an input, scoring instead with 
-	the default function to ignore the effects of constraints.
-	"""
-	# Making a new pose to avoid messing up the input
-	ddg_pose = Pose()
-	ddg_pose.assign(pose)
-
-	sf = get_fa_scorefxn()
-
-	# Score when docked
-	dock_score = sf(ddg_pose)
-
-	# Score when separate
-	pt = make_pack_task(ddg_pose, pack_res=near_res+range(197,208))
-	ddg_pose = move_apart(ddg_pose, 197, 207)
-	ddg_pose = design_pack(ddg_pose, sf, pt)
-	split_score = sf(ddg_pose)
-
-	ddg = dock_score - split_score
-
-	return [round(i,3) for i in [dock_score, split_score, ddg]]
-
-
-def ident_mutations(start_pose, end_pose, residues, start_set, end_set):
-	"""
-	Compares the sequences of a starting pose and ending pose at specified 
-	residues and identifies differences. Returns a string listing changes in 
-	the format of ANB, where A is the starting residue, N is the residue 
-	number, and B is the ending residue.
-	"""
-	mutations = ''
-	for i in residues:
-		start_res = start_pose.residue(i).name1()
-		end_res = end_pose.residue(i).name1()
-		if start_res != end_res:
-			r_i = residues.index(i)
-			e_dif = '(' + str(round(end_set[r_i] - start_set[r_i], 3)) + ')'
-			mut_string = start_res + str(i) + end_res + e_dif
-			mutations = ','.join([mutations, mut_string])
-
-	if mutations == '':
-		return "NONE"
-	else:
-		return mutations.lstrip(',')
-
-
-def set_design(pdb, sf, pep_res, des_res, near_res, num_decoys, resfile, tf):
-	"""
-	Uses the job distributor to output a set of proteases designed for 
-	compatability with a threaded peptide sequence. Outputs a provided number
-	of decoys into a directory that is also a required input. Will relax the 
-	pdb, then run 20 rounds of design/repacking plus minimization. For all 
-	movers, only the residues in the peptide and those within the input list
-	are repackable, and only those in the input list are designable. For the 
-	relax, the peptide backbone is flexible, and constraints are applied.
-	"""
-	pose = apply_constraints(pose_from_pdb(pdb))
-	ft = make_fold_tree()
-	pose.fold_tree(ft)
-	#mm = make_move_map(des_res + near_res) # for relax and minimization
-	mm = make_move_map(near_res) # for relax and minimization
-
-	dec_name = pdb.replace('.pdb.gz', '_designed')
-	jd = PyJobDistributor(dec_name, num_decoys, sf)
-
-	while not jd.job_complete:
-		pp = Pose()
-		pp.assign(pose)
-		# Relaxing
-		relax_name = jd.current_name.replace('designed', 'relaxed')
-		pp = fastrelax(pp, sf, mm)
-		pp.dump_pdb(relax_name)
-		rel_pro_set = res_scores(pp, des_res, sf)[1]
-		rel_pep_set = res_scores(pp, pep_res, sf)[1]
-
-		# Doing design
-		#for i in range(20):
-		#	pt = make_pack_task(pp, resfile=resfile)
-		#	pp = design_pack(pp, sf, pt)
-		#	pp = minmover(pp, sf, mm)
-		pp = fastdesign(pp, sf, mm, tf)
-
-		# Getting residue scores, ddG, and mutations list
-		prot_res_e, pro_re_set = res_scores(pp, des_res, sf)
-		pep_res_e, pep_re_set = res_scores(pp, pep_res, sf)
-		dock_split_ddg = score_ddg(pp, des_res + near_res)
-		pro_mut = ident_mutations(pose, pp, des_res, rel_pro_set, pro_re_set)
-		pep_mut = ident_mutations(pose, pp, pep_res, rel_pep_set, pep_re_set)
-
-		# Making line to add to fasc file
-		scores = [prot_res_e, pep_res_e] + dock_split_ddg + [pro_mut, pep_mut]
-		temp = "protease_res_scores: {}\tpeptide_res_scores: {}\t"
-		temp += "docked_score: {}\tsplit_score: {}\tddG: {}\t"
-		temp += "prot_mutations: {}\tpep_mutations: {}"
-		score_text = temp.format(*[str(i) for i in scores])
-		print score_text, '\n'
-		jd.additional_decoy_info = score_text
-
-		jd.output_decoy(pp)
-
-
+######### Main ###############################################################
 def main():
 	# Getting user inputs
 	args = parse_args()
@@ -543,11 +674,8 @@ def main():
 	ros_opts = init_opts(cst_file=args.constraints)
 	init(options=ros_opts)
 
-	# Score function
-	sf = create_score_function('ref2015_cst')
-
 	# Destination folder for PDB files
-	pose = pose_from_pdb(pose)
+	pose = pose_from_pdb(args.start_struct)
 	dir_nam = args.out_dir
 	if not isdir(dir_nam):
 		makedirs(dir_nam)
@@ -557,33 +685,16 @@ def main():
 	uncut_seq = get_seq_list(args.uncut_peptide_sequence)
 
 	# Creating threaded structures
-	make = False
-	if args.thread:
-		make = True
+	make = args.thread
 	t_structs = quick_thread(dir_nam, pose, cut_seq, cleaved=True, make=make)
 	t_structs += quick_thread(dir_nam, pose, uncut_seq, make=make)
 
 	# Making residue selectors
-	cat_res_selector = ResidueIndexSelector('72,96,154')
-	pep_res_selector = ChainSelector("B")
-	mut_res_selector = mutable_residues_selector(args.design_peptide)
-	pac_res_selector = packable_residues_selector(mut_res_selector)
-	oth_res_selector = other_residues_selector(mut_res_selector, 
-												pac_res_selector)
-
-	# Converting selectors to lists
-	pep_res = selector_to_list(pose, pep_res_selector)
-	des_res = selector_to_list(pose, mut_res_selector)
-	near_res = selector_to_list(pose, pac_res_selector)
-	other_res = selector_to_list(pose, oth_res_selector)
-
-	# Making task factory
-	tf = make_task_factory(pac_res_selector, oth_res_selector)
-	task=tf.create_task_and_apply_taskoperations(pose)
+	residue_selectors = select_residues(design_peptide=args.design_peptide)
 
 	# Doing design on threaded models
 	for struc in t_structs:
-		set_design(struc, sf, pep_res, des_res, near_res, 10, args.resfile, tf)
+		set_design(struc, residue_selectors, args.number_decoys, args.method)
 
 
 if __name__ == '__main__':

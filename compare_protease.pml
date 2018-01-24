@@ -3,9 +3,8 @@ color cyan
 select protease, chain A
 select peptide, chain B
 select cat_res, res 72+96+154
-select des_res, res 52+56-58+70+73+124+138+147+150-153+169+171-175+183
-select shell_res, res 4+6+31+51+53+55+59+69+71+121+123+125+134-135+137+139+146+148-149+156+158+168+170+179+182
-
+select des_res, res 58+138+147+150-153+169+171-174+183
+select shell_res, res 51-57+59+69-71+73-75+121+123-124+134-135+137+139+146+148-149+155-156+158+168+170+175-182
 color yellow, peptide
 color magenta, cat_res
 color purpleblue, des_res

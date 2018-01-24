@@ -45,8 +45,8 @@ class mutation_collection:
 		self.decoy_count = len(self.designed_pdbs)
 
 		# Defining relevant residues
-		self.des_res = [52, 56, 57, 58, 70, 73, 124, 138, 150, 151, 
-						152, 153, 169, 171, 172, 173, 174, 175, 183]
+		self.des_res = \
+			[58, 138, 147, 150, 151, 152, 153, 169, 171, 172, 173, 174, 183]
 		self.pep_res = range(197, 208)
 
 		# Setting score function
