@@ -4,12 +4,16 @@ To Do
 		Different sampling protocols
 			--Original manual loop
 			--FastDesign
-			FlexPepDock
+			XX FlexPepDock
+				XX clashes with enzdes constraints
+				may mitigate using Will's constraints trick
+				for reference: init('-enzdes::cstfile ly104.cst -packing:resfile resfiles/updated_ly104_protease.resfile -run:preserve_header -cst_fa_weight 1.0 -flexPepDocking:receptor_chain A -flexPepDocking:peptide_chain B -flexPepDocking:design_peptide true -lowres_abinitio true')
 			Backrub
 			Others?
 		Adjust residue selection
 			--Ignore prime region of peptide
-			Differential selection based on side chain length?
+			--Differential selection based on side chain length?
+				--Selectors applied after threading, rather than before
 		--What's up with residue scores?
 		Improve output
 			Aggregate mutation info across all models vs mutations specific to peptides
@@ -21,7 +25,7 @@ To Do
 			--Change mutations output to make columns match, separate start/end/energy change 
 			Add sequence change classification, compared to cannonical sequences?
 		--Increase decoy count
-		Borrow from WIll's script to ditch CST files
+		Borrow from Will's script to ditch CST files
 
 	From viewed AEPDIR_1
 		Back-convert res 56 to Q
@@ -31,10 +35,15 @@ To Do
 		D183K was good w/ asp 4 of peptide
 		Lysine on prime side doesn't matter
 
-	Find cannonical (HCV) sequences 
+	--Find cannonical (HCV) sequences 
 		Didn't find in Manasi'd paper (4?)
-		**** Lin, Chao 2006 **** --> which is ours?
-
+		**** Lin, Chao 2006, fig 2C ****
+		Focus on 1b, exclude NS3/NS4A site
+		Efficiency: NS5A/NS5B > NA4A/NA4B >> 	NS4B/NS5A
+					EDVVCC		DEMEEC			DCSTPC
+		Others		DS I 						EYPI
+					Q							  TV
+												   S
 		Charge before CS?
 		Compare residue types in designed sequences against these
 
@@ -53,6 +62,7 @@ Ideas
 		Scaling by residue mutation propensity?
 	Getting a sense of cleavage efficiency for known cleaved, vs. different Rosetta scores
 	Would be nice if movemap worked with residue selectors
+	Would be nice if designing with FlexPepDock didn't require flags and a resfile, had setter for score function
 
 Literature to seek
 	* HTRA protease--has PDZ and protease

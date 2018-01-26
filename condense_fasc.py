@@ -33,21 +33,35 @@ def main():
 			with open(f, 'r') as read:
 				f_lines = read.readlines()
 				f_lines.pop(0) # First line is not useful
-				lines_data = [i.split()[1::2] for i in f_lines]
+				lines_data = []
+				for i in f_lines:
+					start_mutations = i.find('prot_mutations')
+					start_pep_mutations = i.find('pep_mutations')
+					scores_section = i[:start_mutations].split()
+					prot_mutations_section = \
+						i[start_mutations:start_pep_mutations].split()
+					pep_mutations_section = \
+						i[start_pep_mutations + 15:].split()
+					line_data = scores_section[1::2] + \
+						prot_mutations_section + pep_mutations_section
+					if i == f_lines[0]:
+						headline = scores_section[::2]
+					lines_data.append(line_data)
 				lines_data.sort()
 
 			# Making template and header
-			if f == fasc_files[0]:
-				headline = f_lines[0].split()[::2]
-				template = '{:50s}' + '{:25s}' * (len(headline) - 3) 
-				template += '{:110s}' * 2 + '\n'
-				r.write(template.format(*headline))
+			head_length = len(headline)
+			template = '{:50s}' + '{:25s}' * (head_length - 1) 
+			r.write(template.format(*headline) + '\n')
 
 			# Adding in lines
 			for line in lines_data:
 				line[0] = basename(line[0])
-				r.write(template.format(*line))
+				line_out = template.format(*line[:head_length])
+				line_out += '   '.join(line[head_length + 1:])
+				r.write(line_out + '\n')
 
+	print report_name
 
 if __name__ == '__main__':
 	main()

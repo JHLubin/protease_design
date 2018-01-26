@@ -212,49 +212,45 @@ def other_residues_selector(mutable_selector, packable_selector):
 	return other_res_selector
 
 
+def movemap_packable_residues_selector(peptides, mutables, packables):
+	""" 
+	Combines selectors for all residues for which a MoveMap should 
+	set chi true.
+	"""
+	combined = OrResidueSelector()
+	combined.add_residue_selector(peptides)
+	combined.add_residue_selector(mutables)
+	combined.add_residue_selector(packables)
+
+	return combined
+
+
 def select_residues(design_peptide=False):
 	""" Makes residue selectors for HCV protease sections """
 	residue_selectors = {}
-	residue_selectors['catalytic'] = ResidueIndexSelector('72,96,154')
-	residue_selectors['peptide'] = ChainSelector("B")
-	residue_selectors['mutable'] = mutable_residues_selector(design_peptide)
-	residue_selectors['packable'] = \
-		packable_residues_selector(residue_selectors['mutable'])
-	residue_selectors['other'] = \
-		other_residues_selector(residue_selectors['mutable'], 
-								residue_selectors['packable'])
+
+	catalytic = ResidueIndexSelector('72,96,154')
+	residue_selectors['catalytic'] = catalytic
+
+	protease = ChainSelector("A")
+	residue_selectors['protease'] = protease
+
+	peptide = ChainSelector("B")
+	residue_selectors['peptide'] = peptide
+
+	mutable = mutable_residues_selector(design_peptide)
+	residue_selectors['mutable'] = mutable
+
+	packable = packable_residues_selector(mutable)
+	residue_selectors['packable'] = packable
+	
+	other = other_residues_selector(mutable, packable)
+	residue_selectors['other'] = other
+
+	mm_pack = movemap_packable_residues_selector(peptide, mutable, packable)
+	residue_selectors['movemap_pack'] = mm_pack
 
 	return residue_selectors
-
-
-def selector_to_list(pose, selector):
-	""" Converts a selector output vector to a list of selected residues """
-	selection_vector = selector.apply(pose)
-	selection_list = []
-	for i in range(len(selection_vector)): 
-		if selection_vector[i+1]==1:
-			selection_list.append(i+1)
-
-	return selection_list
-
-
-def make_residue_lists(pose, residue_selectors):
-	""" 
-	Converts a dict of selectors to a list of selected residues for a pose 
-	"""
-	residue_lists = {}
-	residue_lists['catalytic'] = \
-		selector_to_list(pose, residue_selectors['catalytic'])
-	residue_lists['peptide'] = \
-		selector_to_list(pose, residue_selectors['peptide'])
-	residue_lists['mutable'] = \
-		selector_to_list(pose, residue_selectors['mutable'])
-	residue_lists['packable'] = \
-		selector_to_list(pose, residue_selectors['packable'])
-	residue_lists['other'] = \
-		selector_to_list(pose, residue_selectors['other'])
-
-	return residue_lists
 
 ######### Design #############################################################
 def apply_constraints(pose):
@@ -282,25 +278,16 @@ def make_fold_tree():
 	return ft
 
 
-def make_move_map(pose, residue_lists):
+def make_move_map(pose, peptide_residues, repackable_residues):
 	""" 
 	Makes a movemap for a protease-peptide system, with all non-peptide 
 	residue backbones fixed, and side chains mobile for the peptide and all
 	residues in an input selection, which is intended to be the nearby  
 	residues, excluding the catalytic ones. 
 	"""
-	# Converting from selection to values
-	peptide_residues = residue_lists['peptide']
-	repackable_residues = peptide_residues + \
-							residue_lists['mutable']+ \
-							residue_lists['packable']
-
-	# Making movemap
 	mm = MoveMap()
-
 	for i in peptide_residues:
 		mm.set_bb(i, True)
-
 	for i in repackable_residues:
 		mm.set_chi(i, True)
 
@@ -521,6 +508,58 @@ def ident_mutations(start_pose, end_pose, residues, start_set, end_set):
 		return "NONE"
 
 ######### Design and evaluation protocol #####################################
+class mutation_collection:
+	"""
+	This class object will include information on the mutations in decoys 
+	produced by design_protease.py
+
+	Decided against collecting all data this way because it doesn't work well 
+	with parallel processes on larger sets.
+	"""
+	def __init__(self, threaded_pose, selector_dict):
+		self.threaded_pose = threaded_pose
+		self.selectors = selector_dict
+		self.selectors_to_list()
+
+		self.decor_identifiers = []
+		self.relaxed_decoys = []
+		self.designed_decoys = []
+
+	def selectors_to_list(self):
+		""" Converts a selector output vector to lists of selected residues """
+		for set_name in self.selectors:
+			selector = self.selectors[set_name]
+			selection_vector = selector.apply(self.threaded_pose)
+
+			selection_list = []
+			for i in range(len(selection_vector)): 
+				if selection_vector[i+1]==1:
+					selection_list.append(i+1)
+
+			setattr(self, set_name + '_residues', selection_list)
+
+	def read_sequence_name(self, name):
+		""" 
+		Reads name of file generated earlier in this script by quick_thread 
+		and determines whether it is a cleaved or uncleaved sequence and what
+		the sequence is.
+		"""
+		breakup = name.split('_')
+		print breakup
+
+		# Determining whether sequence is cleaved
+		cleavage = breakup[0]
+		assert cleavage in ['cleaved', 'uncleaved']
+		if cleavage == 'cleaved':
+			self.cleaved = True
+		else:
+			self.cleaved = False
+
+		# Determining sequence
+		self.sequence = breakup[-2]
+		self.recognition_sequence = self.sequence[1:7]
+
+
 def set_design(pdb, residue_selectors, num_decoys, method):
 	"""
 	Uses the job distributor to output a set of proteases designed for 
@@ -532,12 +571,12 @@ def set_design(pdb, residue_selectors, num_decoys, method):
 	relax, the peptide backbone is flexible, and constraints are applied.
 	"""
 	pose = apply_constraints(pose_from_pdb(pdb))
-	residue_lists = make_residue_lists(pose, residue_selectors)
+	mc = mutation_collection(pose, residue_selectors)
 
 	sf = create_score_function('ref2015_cst')
 	ft = make_fold_tree() # Hard-coded for HCV protease
 	pose.fold_tree(ft) # Improve sampling efficiency
-	mm = make_move_map(pose, residue_lists) # for relax and minimization
+	mm = make_move_map(pose, mc.peptide_residues, mc.movemap_pack_residues)
 	tf = make_task_factory(residue_selectors)
 
 	dec_name = pdb.replace('.pdb.gz', '_designed')
@@ -546,30 +585,32 @@ def set_design(pdb, residue_selectors, num_decoys, method):
 	while not jd.job_complete:
 		pp = Pose()
 		pp.assign(pose)
-		relaxed_struc = Pose()
 
 		# Relaxing
 		print 'relaxing'
 		relax_name = jd.current_name.replace('designed', 'relaxed')
 		pp = fastrelax(pp, sf, mm)
+		relaxed_struc = Pose()
 		relaxed_struc.assign(pp)
 		relaxed_struc.dump_pdb(relax_name)
 
 		# Doing design, default is FastDesign
 		print 'designing'
 		if method == 'custom':
-			pp = custom_design(pp, sf, mm, tf, 5)
+			pp = custom_design(pp, sf, mm, tf, 20)
 		else:
-			pp = fastdesign(pp, sf, mm, tf)
+			pp = fastdesign(pp, sf, mm, tf)		
 
 		# Getting residue scores, ddG, and mutations list
-		rel_pro_set = res_scores(relaxed_struc, residue_lists['mutable'], sf)[1]
-		rel_pep_set = res_scores(relaxed_struc, residue_lists['peptide'], sf)[1]
-		prot_res_e, pro_re_set = res_scores(pp, residue_lists['mutable'], sf)
-		pep_res_e, pep_re_set = res_scores(pp, residue_lists['peptide'], sf)
+		rel_pro_set = res_scores(relaxed_struc, mc.mutable_residues, sf)[1]
+		rel_pep_set = res_scores(relaxed_struc, mc.peptide_residues, sf)[1]
+		prot_res_e, pro_re_set = res_scores(pp, mc.mutable_residues, sf)
+		pep_res_e, pep_re_set = res_scores(pp, mc.peptide_residues, sf)
 		dock_split_ddg = score_ddg(pp, tf)
-		pro_mut = ident_mutations(pose, pp, residue_lists['mutable'], rel_pro_set, pro_re_set)
-		pep_mut = ident_mutations(pose, pp, residue_lists['peptide'], rel_pep_set, pep_re_set)
+		pro_mut = ident_mutations(pose, pp, mc.mutable_residues, 
+									rel_pro_set, pro_re_set)
+		pep_mut = ident_mutations(pose, pp, mc.peptide_residues, 
+									rel_pep_set, pep_re_set)
 
 		# Making line to add to fasc file
 		scores = [prot_res_e, pep_res_e] + dock_split_ddg + [pro_mut, pep_mut]
@@ -582,89 +623,6 @@ def set_design(pdb, residue_selectors, num_decoys, method):
 
 		jd.output_decoy(pp)
 
-######### DEPRACATED #########################################################
-def res_ca_cords(pose, res):
-	""" Returns the x,y,z coordinates of the A-carbon of a given residue"""
-	res_coords = []
-	for i in range(3):
-		res_coords.append(pose.residue(res).xyz('CA')[i])
-
-	return res_coords
-
-
-def point_dist(point_1, point_2):
-	""" Given two sets of coordinates, determines distance between them """
-	sum_difs_squared = 0
-	for i in range(3):
-		sum_difs_squared += (point_2[i] - point_1[i]) ** 2
-
-	return sqrt(sum_difs_squared)
-
-
-def res_to_design(pdb, radius=8, exclude_res=[72, 154]):
-	""" 
-	Determines the chain in the PDB that is the peptide, assuming that the 
-	peptide is smallest. Determines the coordinates of all a-carbons in the 
-	system, then checks the distances to each atom in the peptide. If the 
-	atom is within the cutoff radius, it is added to the list of designable 
-	residues. Returns a list of mutable residues.
-	"""
-	pose = pose_from_pdb(pdb)
-	chains = pose.split_by_chain()
-
-	# Determining peptide chain
-	pep_chain_no = 1
-	for i in range(2, len(chains) + 1):
-		if len(chains[i]) < len(chains[pep_chain_no]):
-			pep_chain_no = i
-	pep_chain = chains[pep_chain_no]
-	chains.pop(pep_chain_no) # removes peptide chain from chain list
-
-	# Getting residue number of peptide start
-	pep_start = 1
-	for i in range(1,pep_chain_no):
-		pep_start += chains[i].total_residue()
-
-	# Getting peptide residue CA coordinates:
-	pep_coords = []
-	for i in range(1, pep_chain.total_residue() + 1):
-		pep_coords.append(res_ca_cords(pep_chain, i))
-
-	# Populating the list of designable residues
-	mutable_residues = []
-	for chain in chains:
-		# Note that chains now excludes the peptide chain
-		for res in range(1, chain.total_residue() + 1):
-			if res in exclude_res:
-				# Exclude the catalytic residues from the designable list
-				continue
-			a_cords = res_ca_cords(pose, res)
-			for i in pep_coords:
-				# If any res is within radius of any pep res, add to the list
-				if point_dist(a_cords, i) <= radius:
-					mutable_residues.append(res)
-					break
-
-	return mutable_residues  
-
-
-def make_pack_task(pose, resfile=None, pack_res=[]):
-	""" 
-	Makes a packer task for a given pose using an input resfile or list of 
-	packable (not designable) residues. 
-	"""
-	# Packer for protease + peptide\
-	task = standard_packer_task(pose)
-	if resfile:
-		parse_resfile(pose, task, resfile)
-	else:
-		task.restrict_to_repacking()
-		task.temporarily_fix_everything()
-		for i in pack_res:
-			task.temporarily_set_pack_residue(i, True)
-
-	return task
-
 ######### Main ###############################################################
 def main():
 	# Getting user inputs
@@ -675,7 +633,6 @@ def main():
 	init(options=ros_opts)
 
 	# Destination folder for PDB files
-	pose = pose_from_pdb(args.start_struct)
 	dir_nam = args.out_dir
 	if not isdir(dir_nam):
 		makedirs(dir_nam)
@@ -685,6 +642,7 @@ def main():
 	uncut_seq = get_seq_list(args.uncut_peptide_sequence)
 
 	# Creating threaded structures
+	pose = pose_from_pdb(args.start_struct)
 	make = args.thread
 	t_structs = quick_thread(dir_nam, pose, cut_seq, cleaved=True, make=make)
 	t_structs += quick_thread(dir_nam, pose, uncut_seq, make=make)
@@ -699,3 +657,14 @@ def main():
 
 if __name__ == '__main__':
 	main()
+
+######### Old functions that might be handy outside ##########################
+def selector_to_list(pose, selector):
+	""" Converts a selector output vector to a list of selected residues """
+	selection_vector = selector.apply(pose)
+	selection_list = []
+	for i in range(len(selection_vector)): 
+		if selection_vector[i+1]==1:
+			selection_list.append(i+1)
+
+	return selection_list 
