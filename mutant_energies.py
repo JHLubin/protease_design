@@ -43,12 +43,13 @@ class mutation_collection:
 
 		# Identifying mutations and their frequency and energies
 		other_class_values = ['mutations', 'mut_freq', 'mut_location', 
-			'mut_res_es', 'mut_int_es', 'residues_with_mutations']
+			'mut_res_es', 'mut_int_es']
 		for i in other_class_values:
 			setattr(self, i, [])
+		self.mutation_objects = []
 
 		for i in range(self.decoy_count):
-			print 'analyzing decoy', i
+			print '\tanalyzing decoy', i
 			self.ident_mutations(self.relaxed_pdbs[i], self.designed_pdbs[i])
 
 		# Getting mutation frequencies, energy averages
@@ -142,6 +143,15 @@ class mutation_collection:
 		self.des_res = selector_to_list(threaded_pose, designable_selector)
 
 	##########################################################################
+	def track_mutation(self, locus, start, end):
+		""" 
+		Makes a mutation_location object to keep track of a mutation and its 
+		frequency of occurrence.
+		"""
+		ml = mutation_location(self.short_sequence, self.decoy_count, 
+								locus, start, end)
+		return ml
+
 	def residue_before_and_after(self, res, before, after):
 		""" Determines the AA in the same position in two poses """
 		start_res = before.residue(res)
@@ -153,28 +163,6 @@ class mutation_collection:
 		mut_string = '_'.join([str(res), start_res_name, end_res_name])
 
 		return start_res_name, end_res_name, mut_string
-
-	def residue_pairwise_energy(self, res, before, after):
-		""" 
-		Theis function determines whether a mutation is on the protease or  
-		peptide, and conversely the relevant set of residues contributing to 
-		the mutated residue's score. Then it runs interact_energy accordingly
-		on the residue in the relaxed and designed poses, and calculates the
-		difference.
-		"""
-		if res in self.pep_res:
-			mut_loc = 'Peptide'
-			partner = self.des_res
-		else:
-			mut_loc = 'Protease'
-			partner = self.pep_res
-
-		# Getting sum residue interaction energy with contact residues
-		res_start_int_e = self.interact_energy(before, res, partner)
-		res_end_int_e = self.interact_energy(after, res, partner)
-		res_delta_int_e = res_end_int_e - res_start_int_e
-
-		return mut_loc, res_delta_int_e
 		
 	def interact_energy(self, pose, res, interaction_set):
 		""" 
@@ -206,17 +194,39 @@ class mutation_collection:
 
 		return sum_int_energy
 
+	def residue_pairwise_energy(self, res, before, after):
+		""" 
+		Theis function determines whether a mutation is on the protease or  
+		peptide, and conversely the relevant set of residues contributing to 
+		the mutated residue's score. Then it runs interact_energy accordingly
+		on the residue in the relaxed and designed poses, and calculates the
+		difference.
+		"""
+		if res in self.pep_res:
+			mut_loc = 'Peptide'
+			partner = self.des_res
+		else:
+			mut_loc = 'Protease'
+			partner = self.pep_res
+
+		# Getting sum residue interaction energy with contact residues
+		res_start_int_e = self.interact_energy(before, res, partner)
+		res_end_int_e = self.interact_energy(after, res, partner)
+		res_delta_int_e = res_end_int_e - res_start_int_e
+
+		return mut_loc, res_delta_int_e
+
 	def ident_mutations(self, rel_pdb, des_pdb):
 		"""
 		Compares the sequences of a decoy before and after design at specified 
 		residues, and identifies the differences. Mutations are identified in 
-		the format of N_A_B, where A is the starting residue, N is the residue 
-		number, and B is the ending residue. The residue energy difference for 
-		the mutation is also reported, as is the sum of two-residue 
+		the format of N_A_B, where N is the residue number, A is the starting 
+		residue, and B is the ending residue. The residue energy difference for 
+		the mutation is also collected, as is the sum of two-residue 
 		interactions between the mutated residue and the peptide residues (if 
 		the mutated residue is on the protease) or between the mutated 
 		residue and the mutable protease residues (if the residue is on the 
-		peptide). relax_res_energy from design_protease.
+		peptide). relax_res_energy ia s function from design_protease.
 		"""
 		# Getting starting and end poses, excerpts from residue energy tables
 		relax_pose = pose_from_pdb(rel_pdb)
@@ -256,7 +266,23 @@ class mutation_collection:
 					self.mut_freq.append(1)
 					self.mut_res_es.append([res_delta_e])
 					self.mut_int_es.append([res_delta_int_e])
-					self.residues_with_mutations.append(i)
+
+
+class mutation_location:
+	""" 
+	Stores a mutation's location, before-and-after, and rate of occurrence 
+	"""
+	def __init__(self, pep_sequence, num_models, locus, initial_aa, final_aa):
+		self.peptide_sequence = pep_sequence
+		self.mutated_position = locus
+		self.native_residue = initial_aa
+		self.mutant_residue = final_aa
+		self.number_decoys = num_models
+		self.observed_occurrences = 0.0
+
+	def mutation_frequency(self):
+		""" Returns the rate in the sample set of a mutation's occurrence """
+		return self.observed_occurrences / self.number_decoys
 
 
 def isolate_sequence_from_fasc(fasc_name):
@@ -299,6 +325,22 @@ def mutations_by_seq_report(name, mc, head=False):
 		for l in report_lines:
 			r.write(template.format(*l))
 
+
+def aggregated_report(mc_set):
+	"""
+	Whereas the mutations_by_seq_report lists the mutations each sequence 
+	experienced, this report summarizes mutation occurrences across the entire
+	available dataset.
+	"""
+
+	complete_residues_list = []
+	for mc in mc_set:
+		for i in mc.des_res:
+			if i not in complete_residues_list:
+				complete_residues_list.append(i)
+
+
+
 ##############################################################################
 def main():
 	# Getting user inputs
@@ -313,7 +355,7 @@ def main():
 	report_files = sorted(glob(join(folder, '*.fasc')))
 	peptide_sequences = [isolate_sequence_from_fasc(i) for i in report_files]
 	
-	# Simultaneously analyzing and writing to report
+	# Simultaneously analyzing and writing to by-sequence report
 	seq_mutants = []
 	report_name = join(folder.rstrip('/') + '_mutation_summary.txt')
 	for n, i in enumerate(peptide_sequences):
@@ -324,6 +366,8 @@ def main():
 			mutations_by_seq_report(report_name, seq_muts, head=True)
 		else:
 			mutations_by_seq_report(report_name, seq_muts)
+
+	# Making cross-sequence aggregated report
 	
 
 if __name__ == '__main__':
