@@ -27,6 +27,7 @@ def main():
 
 	# Making combined report
 	report_name = folder.rstrip('/') + '_combined_reports.fasc'
+	report_name = join(folder, report_name)
 	with open(report_name, 'w') as r:
 		for f in fasc_files:
 			# Reading in individual FASC file

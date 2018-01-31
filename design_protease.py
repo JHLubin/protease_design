@@ -105,6 +105,7 @@ def quick_thread(destination, pose, sequences, cleaved=False, make=False):
 		thread_files.append(out_name)
 
 		if make:
+			print out_name
 			# Threading peptide sequences
 			tm = SimpleThreadingMover(seq, 197)
 			threaded_pose = Pose()
@@ -644,6 +645,8 @@ def main():
 	# Creating threaded structures
 	pose = pose_from_pdb(args.start_struct)
 	make = args.thread
+	if make:
+		print "Threading"
 	t_structs = quick_thread(dir_nam, pose, cut_seq, cleaved=True, make=make)
 	t_structs += quick_thread(dir_nam, pose, uncut_seq, make=make)
 
