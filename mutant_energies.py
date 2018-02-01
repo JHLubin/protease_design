@@ -220,7 +220,7 @@ class mutation_collection:
 		interactions between the mutated residue and the peptide residues (if 
 		the mutated residue is on the protease) or between the mutated 
 		residue and the mutable protease residues (if the residue is on the 
-		peptide). relax_res_energy ia s function from design_protease.
+		peptide). res_scores ia a function from design_protease.
 		"""
 		# Getting starting and end poses, excerpts from residue energy tables
 		relax_pose = pose_from_pdb(rel_pdb)
@@ -314,15 +314,25 @@ class mutations_aggregate:
 		# Initializing data bins
 		self.total_potential_models = 0
 		self.actual_potential_models = [0] * self.mutable_count
-		self.mutations = []
-		while len(self.mutations) < self.mutable_count:
-			self.mutations.append({})
 		self.mutations_counts = [0] * self.mutable_count
 
+		self.mutation_occurrences = []
+		self.mutation_res_total_energies_raw = []
+		self.mutation_res_interact_energies_raw = []
+		while len(self.mutation_occurrences) < self.mutable_count:
+			self.mutation_occurrences.append({})
+			self.mutation_res_total_energies_raw.append({})
+			self.mutation_res_interact_energies_raw.append({})
+
 		# Populating bins
-		self.starting_residues = self.initial_residues()
+		self.starting_residues = self.get_initial_residues()
 		self.collect_mutations_and_frequencies()
 		self.count_mutations()
+		self.condense_energies()
+
+		# Creating report file
+		self.pre_report = self.mc_tabulation()
+		self.report = self.cleanup_report_table()
 
 	def get_full_residue_list(self):
 		""" 
@@ -338,7 +348,7 @@ class mutations_aggregate:
 		complete_residues_list.sort()
 		return complete_residues_list
 
-	def initial_residues(self):
+	def get_initial_residues(self):
 		""" Collect starting residues, before mutation. Sloppy hard-coded. """
 		pose_seq = 'GSVVIVGRIILSGRGGPITAYAQQTRGLLGCIITSLTGRDKNQVEGEVQIVSTAAQT'
 		pose_seq += 'FLATCINGVCWTVYHGAGTRTIASPKGPVIQMYTNVDQDLVGWPASQGTRSLTPCT'
@@ -362,8 +372,11 @@ class mutations_aggregate:
 		where N is the residue number, A is the starting residue, and B is 
 		the ending residue. For this application, a list of lists is more 
 		useful. This function makes that conversion and appends the frequency 
-		of mutation. Returns a list in form [N, B, F], where F is the 
-		frequency with which the mutation was observed.
+		of mutation. Returns a list in form [N, B, F, E, I], where F is the 
+		frequency with which the mutation was observed, E is the set of 
+		total residue energy changes associated with the mutation, anf I is 
+		the set of residue interaction energy changes associated with the 
+		mutation.
 		"""
 		converted_mutations_list = [i.split('_') for i in mc.mutations]
 
@@ -372,6 +385,8 @@ class mutations_aggregate:
 			 i.pop(1) # Remove original residue
 			 i[1] = str(i[1])
 			 i.append(mc.mut_freq[n])
+			 i.append(mc.mut_res_es[n])
+			 i.append(mc.mut_int_es[n])
 
 		converted_mutations_list.sort()
 		return converted_mutations_list
@@ -397,29 +412,169 @@ class mutations_aggregate:
 			for i in mc_muts:
 				ind = self.residues_list.index(i[0])
 
-				bin_space = self.mutations[ind]
-				if i[1] in bin_space:
-					bin_space[i[1]] += i[2]
+				if i[1] in self.mutation_occurrences[ind]:
+					self.mutation_occurrences[ind][i[1]] += i[2]
+					self.mutation_res_total_energies_raw[ind][i[1]] += i[3]
+					self.mutation_res_interact_energies_raw[ind][i[1]] += i[4]
 				else:
-					bin_space[i[1]] = i[2]
-
+					self.mutation_occurrences[ind][i[1]] = i[2]
+					self.mutation_res_total_energies_raw[ind][i[1]] = i[3]
+					self.mutation_res_interact_energies_raw[ind][i[1]] = i[4]
 
 	def count_mutations(self):
 		""" 
-		Gets count of how many times a residue has mutated across all sets 
+		Gets count of how many times a residue has mutated across all sets.
+		Also makes list of rates of mutation occurrence 
 		"""
-		for n, i in enumerate(self.mutations):
+		for n, i in enumerate(self.mutation_occurrences):
 			for m in i:
 				self.mutations_counts[n] += i[m]
 
+		self.res_mutation_propensity = []
+		for i in range(self.mutable_count):
+			numerator = float(self.mutations_counts[i])
+			denominator = float(self.actual_potential_models[i])
+			propensity = round(numerator / denominator, 3)
+			self.res_mutation_propensity.append(propensity)
 
-def aggregated_report(mc_set):
+	def condense_energies(self):
+		""" 
+		Lists of energies are associated with each mutation. This function
+		gets the average and minimum of those sets.
+		"""
+		bin_set = ['mutation_res_tot_E_average', 'mutation_res_int_E_average',
+					'mutation_res_tot_E_min', 'mutation_res_int_E_min']
+		for i in bin_set:
+			bin = []
+			while len(bin) < self.mutable_count:
+				bin.append({})
+			setattr(self, i, bin)
+
+		for n, pos in enumerate(self.mutation_occurrences):
+			for m in pos:
+				self.mutation_res_tot_E_average[n][m] = \
+					mean(self.mutation_res_total_energies_raw[n][m])
+				self.mutation_res_tot_E_min[n][m] = \
+					min(self.mutation_res_total_energies_raw[n][m])
+				self.mutation_res_int_E_average[n][m] = \
+					mean(self.mutation_res_interact_energies_raw[n][m])
+				self.mutation_res_int_E_average[n][m] = \
+					min(self.mutation_res_interact_energies_raw[n][m])
+
+	def back_convert_N_A_B(self, index, end_res):
+		""" 
+		Function to convert back to the mutation format in mutation_collection 
+		"""
+		locus = str(self.residues_list[index])
+		initial_res = self.starting_residues[index]
+
+		mut_string = '_'.join([locus, initial_res, end_res])
+		return mut_string
+
+	def mc_tabulation(self):
+		""" 
+		"""
+		pre_output_list = []
+		for n, i in enumerate(self.mutation_occurrences):
+			loc = self.residues_list[n]
+			initial = self.starting_residues[n]
+			propensity = self.res_mutation_propensity[n]
+			potential = self.actual_potential_models[n]
+			dr_for_all_models = (potential != self.total_potential_models)
+
+			line_out = []
+			line_out.append(str(loc))
+			line_out.append(initial)
+
+			if propensity == 0:
+				# No mutations at this locus
+				line_out.append('NO_MUTATIONS'+ dr_for_all_models * '*')
+				pre_output_list.append(line_out)
+
+			else:
+				line_out.append(str(propensity) + dr_for_all_models * '*')
+				line_out.append([])
+				for j in i:
+					mut_line_out = []
+					mut_line_out.append(j)
+					occurrence = round(float(i[j]) / potential, 3)
+					mut_line_out.append(str(occurrence))	
+					mut_line_out.append([])	
+
+					mc_mut = self.back_convert_N_A_B(n, j)
+					for mc in self.mc_set:
+						if mc_mut in mc.mutations:
+							mc_extract = []
+							mc_extract.append(mc.short_sequence)
+							t = '\'' + mc.peptide_res_types + '\''
+							mc_extract.append(t)
+							mc_extract.append(str(mc.peptide_charge))
+							mc_extract.append(str(mc.peptide_polarity))
+							m_ind = mc.mutations.index(mc_mut)
+							mc_extract.append(str(mc.mut_rate[m_ind]))
+
+							mut_line_out[-1].append(mc_extract)
+					line_out[-1].append(mut_line_out)
+				pre_output_list.append(line_out)
+
+		return pre_output_list
+
+	def cleanup_report_table(self):
+		""" 
+		Converts table from mc_tabulation to a more readable form 
+		Hard-coded
+		"""
+		le = 10 # hard-coded line length
+		cleaned_table = []
+		for line in self.pre_report:
+			# No mutations
+			if len(line) == 3:
+				new_line = line[:]
+				while len(new_line) < le:
+					new_line.append('')
+				cleaned_table.append(new_line)
+
+			# Mutations
+			else:
+				for mutation in line[3]:
+					for s in mutation[2]:
+						if s == mutation[2][0]:
+							second_part = mutation[:2]
+							if mutation == line[3][0]:
+								first_part = line[:3]
+						else:
+							first_part = ['=""'] * 3
+							second_part = ['=""'] * 2
+
+						third_part = s
+
+						cleaned_table.append(first_part + second_part + 
+												third_part)
+
+		return cleaned_table
+
+
+def aggregated_report(name, mc_set):
 	"""
 	Whereas the mutations_by_seq_report lists the mutations each sequence 
 	experienced, this report summarizes mutation occurrences across the entire
 	available dataset.
 	"""
 	# Get full list of residues that could have been mutated
+	ma = mutations_aggregate(mc_set)
+
+	template = '{:10s}' * 10 + '\n'
+	header = ['location', 'start_AA', 'mut_prob', 'final_AA', 'rel_prob', 
+				'pep_seq', 'seq_class', 'seq_+/-', 'seq_polar', 
+				'mut_prob_by_seq']
+
+	with open(name, 'w') as r:
+		r.write(template.format(*header))
+
+		for line in ma.report:
+			r.write(template.format(*line))
+
+	print name
 
 
 
@@ -436,6 +591,10 @@ def main():
 
 	# Making mutation_collection objects for each sequence
 	report_files = sorted(glob(join(folder, '*.fasc')))
+	for n, i in enumerate(report_files):
+		if 'combined_reports.fasc' in i: # Skip file made by condense_fasc
+			report_files.pop(n)
+
 	peptide_sequences = [isolate_sequence_from_fasc(i) for i in report_files]
 	
 	# Checking if analysis has already been run and pickled
@@ -458,13 +617,17 @@ def main():
 		with open(pickle_name, 'wb') as out:
 			pickle.dump(seq_mutants, out, protocol=-1)
 
+		print report_name
+
 	else:
 		# Retrieving pickled info
 		with open(pickle_name, 'rb') as i:
 			seq_mutants = pickle.load(i)
 
 	# Making cross-sequence aggregated report
-	
+	agg_name = join(folder, folder.rstrip('/') + '_by_mutations.txt')
+	aggregated_report(agg_name, seq_mutants)
+
 
 if __name__ == '__main__':
 	main()
