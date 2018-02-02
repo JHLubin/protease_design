@@ -1,31 +1,22 @@
 To Do
 	Update design protocol
-		--Design both protease and peptide
-		Different sampling protocols
-			--Original manual loop
-			--FastDesign
-			XX FlexPepDock
-				XX clashes with enzdes constraints
-				may mitigate using Will's constraints trick
-				for reference: init('-enzdes::cstfile ly104.cst -packing:resfile resfiles/updated_ly104_protease.resfile -run:preserve_header -cst_fa_weight 1.0 -flexPepDocking:receptor_chain A -flexPepDocking:peptide_chain B -flexPepDocking:design_peptide true -lowres_abinitio true')
-			Backrub
-			Others?
-		Adjust residue selection
-			--Ignore prime region of peptide
-			--Differential selection based on side chain length?
-				--Selectors applied after threading, rather than before
-		--What's up with residue scores?
 		Improve output
 			Aggregate mutation info across all models vs mutations specific to peptides
 				Common vs rare vs situational
 				Connection between mutation and specific residue in peptide sequence?
 				Look at residue type, not just letter
-			Combine current scripts
+				"What sores of sequences had this mutation?"
 			Collect residue mutation propensity
-			--Change mutations output to make columns match, separate start/end/energy change 
+			Mutation type
 			Add sequence change classification, compared to cannonical sequences?
-		--Increase decoy count
 		Borrow from Will's script to ditch CST files
+		Knock out repeat headers in condense_fasc
+		Peptides repeating in extra decoy info when designable
+		Script not picking up peptide mutations
+		Scoring issue still for res/int energies?
+		Add mutation type, group output that way for by-mutation
+		Add energies to by-mutation output
+		Use selectors to see what residues a mutant might interact with
 
 	From viewed AEPDIR_1
 		Back-convert res 56 to Q
@@ -69,3 +60,30 @@ Literature to seek
 		How to model two-domain + substrate in near-attack
 	* Compare a-synuclein and tau papers 
 	Neurosin or cathepsin expression
+
+	##########################################################################
+	Complete
+
+	Scripting
+		--Design both protease and peptide
+		--Different sampling protocols
+			--Original manual loop
+			--FastDesign
+			XX FlexPepDock
+				XX clashes with enzdes constraints
+				may mitigate using Will's constraints trick
+				for reference: init('-enzdes::cstfile ly104.cst -packing:resfile resfiles/updated_ly104_protease.resfile -run:preserve_header -cst_fa_weight 1.0 -flexPepDocking:receptor_chain A -flexPepDocking:peptide_chain B -flexPepDocking:design_peptide true -lowres_abinitio true')
+			XX Backrub
+				Doesn't design
+			XX Others?
+				Nothing seemed better suited than FastDesign
+		--Adjust residue selection
+			--Ignore prime region of peptide
+			--Differential selection based on side chain length?
+				--Selectors applied after threading, rather than before
+		--What's up with residue scores?
+		--Increase decoy count
+		--Improve output
+			XX Combine current scripts
+				Keep decoy generation and analysis separate, otherwise large sets become a problem
+			--Change mutations output to make columns match, separate start/end/energy change 

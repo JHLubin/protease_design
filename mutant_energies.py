@@ -488,7 +488,7 @@ class mutations_aggregate:
 
 			if propensity == 0:
 				# No mutations at this locus
-				line_out.append('NO_MUTATIONS'+ dr_for_all_models * '*')
+				line_out.append('NO MUTATIONS'+ dr_for_all_models * '*')
 				pre_output_list.append(line_out)
 
 			else:
@@ -575,9 +575,6 @@ def aggregated_report(name, mc_set):
 			r.write(template.format(*line))
 
 	print name
-
-
-
 
 ##############################################################################
 def main():

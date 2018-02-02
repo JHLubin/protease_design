@@ -50,10 +50,11 @@ def main():
 					lines_data.append(line_data)
 				lines_data.sort()
 
-			# Making template and header
-			head_length = len(headline)
-			template = '{:50s}' + '{:25s}' * (head_length - 1) 
-			r.write(template.format(*headline) + '\n')
+			if f == fasc_files[0]:
+				# Making template and header
+				head_length = len(headline)
+				template = '{:50s}' + '{:25s}' * (head_length - 1) 
+				r.write(template.format(*headline) + '\n')
 
 			# Adding in lines
 			for line in lines_data:
