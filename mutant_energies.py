@@ -304,6 +304,10 @@ def mutations_by_seq_report(name, mc, head=False):
 
 
 class mutations_aggregate:
+	"""
+	This class object collects mutations information across a set of 
+	mutation_collection objects and performs some analysis.
+	"""
 	def __init__(self, mc_set):
 		self.mc_set = mc_set
 
@@ -471,8 +475,31 @@ class mutations_aggregate:
 		mut_string = '_'.join([locus, initial_res, end_res])
 		return mut_string
 
+	def extract_mut_info(self, mutation_collection, mutation):
+		""" 
+		Pulls report information about a specific mutation from a 
+		mutation_collection object.
+		"""
+		mc_extract = []
+		mc_extract.append(mutation_collection.short_sequence)
+		t = '\'' + mutation_collection.peptide_res_types + '\''
+		mc_extract.append(t)
+		mc_extract.append(str(mutation_collection.peptide_charge))
+		mc_extract.append(str(mutation_collection.peptide_polarity))
+		m_ind = mutation_collection.mutations.index(mutation)
+		mc_extract.append(str(mutation_collection.mut_rate[m_ind]))
+
+		return mc_extract
+
 	def mc_tabulation(self):
 		""" 
+		Loops through all identified mutations and for each, checks the list
+		of mutation_collection objects for which ones yielded that mutation.
+		For each collection that does include the mutation, this function 
+		extracts some information about that collection's substrate sequence, 
+		and about the statistics relating to the mutation within the 
+		collection. Returns a list that gets processed for writing to a report 
+		file.
 		"""
 		pre_output_list = []
 		for n, i in enumerate(self.mutation_occurrences):
@@ -504,16 +531,9 @@ class mutations_aggregate:
 					mc_mut = self.back_convert_N_A_B(n, j)
 					for mc in self.mc_set:
 						if mc_mut in mc.mutations:
-							mc_extract = []
-							mc_extract.append(mc.short_sequence)
-							t = '\'' + mc.peptide_res_types + '\''
-							mc_extract.append(t)
-							mc_extract.append(str(mc.peptide_charge))
-							mc_extract.append(str(mc.peptide_polarity))
-							m_ind = mc.mutations.index(mc_mut)
-							mc_extract.append(str(mc.mut_rate[m_ind]))
-
+							mc_extract = self.extract_mut_info(mc, mc_mut)
 							mut_line_out[-1].append(mc_extract)
+
 					line_out[-1].append(mut_line_out)
 				pre_output_list.append(line_out)
 
@@ -521,18 +541,14 @@ class mutations_aggregate:
 
 	def cleanup_report_table(self):
 		""" 
-		Converts table from mc_tabulation to a more readable form 
-		Hard-coded
+		Converts table from mc_tabulation to a more readable form, intended
+		to be opened in Excel, which leaves a cell visually empty for ="".
 		"""
-		le = 10 # hard-coded line length
 		cleaned_table = []
 		for line in self.pre_report:
 			# No mutations
-			if len(line) == 3:
-				new_line = line[:]
-				while len(new_line) < le:
-					new_line.append('')
-				cleaned_table.append(new_line)
+			if any(['NO MUTATIONS' in i for i in line]):
+				cleaned_table.append(line)
 
 			# Mutations
 			else:
@@ -542,6 +558,8 @@ class mutations_aggregate:
 							second_part = mutation[:2]
 							if mutation == line[3][0]:
 								first_part = line[:3]
+							else:
+								first_part = ['=""'] * 3
 						else:
 							first_part = ['=""'] * 3
 							second_part = ['=""'] * 2
@@ -563,7 +581,8 @@ def aggregated_report(name, mc_set):
 	# Get full list of residues that could have been mutated
 	ma = mutations_aggregate(mc_set)
 
-	template = '{:10s}' * 10 + '\n'
+	line_length = 10
+	template = '{:10s}' * line_length + '\n'
 	header = ['location', 'start_AA', 'mut_prob', 'final_AA', 'rel_prob', 
 				'pep_seq', 'seq_class', 'seq_+/-', 'seq_polar', 
 				'mut_prob_by_seq']
@@ -572,6 +591,8 @@ def aggregated_report(name, mc_set):
 		r.write(template.format(*header))
 
 		for line in ma.report:
+			while len(line) < line_length:
+				line.append('')
 			r.write(template.format(*line))
 
 	print name

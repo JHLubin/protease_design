@@ -471,8 +471,7 @@ def score_ddg(pose, tf):
 	split_score = sf(ddg_pose)
 
 	ddg = dock_score - split_score
-
-	return [round(i,3) for i in [dock_score, split_score, ddg]]
+	return round(ddg, 3)
 
 
 def ident_mutations(start_pose, end_pose, residues, start_set, end_set):
@@ -603,21 +602,15 @@ def set_design(pdb, residue_selectors, num_decoys, method):
 			pp = fastdesign(pp, sf, mm, tf)		
 
 		# Getting residue scores, ddG, and mutations list
-		rel_pro_set = res_scores(relaxed_struc, mc.mutable_residues, sf)[1]
-		rel_pep_set = res_scores(relaxed_struc, mc.peptide_residues, sf)[1]
-		prot_res_e, pro_re_set = res_scores(pp, mc.mutable_residues, sf)
-		pep_res_e, pep_re_set = res_scores(pp, mc.peptide_residues, sf)
-		dock_split_ddg = score_ddg(pp, tf)
+		relax_res_E_set = res_scores(relaxed_struc, mc.mutable_residues, sf)[1]
+		des_res_E_sum, des_res_E_set = res_scores(pp, mc.mutable_residues, sf)
+		ddg = score_ddg(pp, tf)
 		pro_mut = ident_mutations(pose, pp, mc.mutable_residues, 
-									rel_pro_set, pro_re_set)
-		pep_mut = ident_mutations(pose, pp, mc.peptide_residues, 
-									rel_pep_set, pep_re_set)
+									relax_res_E_set, des_res_E_set)
 
 		# Making line to add to fasc file
-		scores = [prot_res_e, pep_res_e] + dock_split_ddg + [pro_mut, pep_mut]
-		temp = "protease_res_scores: {}   peptide_res_scores: {}   "
-		temp += "docked_score: {}   split_score: {}   ddG: {}   "
-		temp += "prot_mutations: {}   pep_mutations: {}"
+		scores = [des_res_E_sum, ddg, pro_mut]
+		temp = "residue_scores: {}   ddG: {}   mutations: {}"
 		score_text = temp.format(*[str(i) for i in scores])
 		print score_text, '\n'
 		jd.additional_decoy_info = score_text

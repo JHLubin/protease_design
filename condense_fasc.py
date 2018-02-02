@@ -24,6 +24,10 @@ def main():
 	folder_search = join(folder,"*.fasc")
 	fasc_files = glob(folder_search)
 	fasc_files.sort()
+	# Prevent self-reference if re-running
+	for n, i in enumerate(fasc_files):
+		if 'combined_reports' in i:
+			fasc_files.pop(n)
 
 	# Making combined report
 	report_name = folder.rstrip('/') + '_combined_reports.fasc'
@@ -36,15 +40,10 @@ def main():
 				f_lines.pop(0) # First line is not useful
 				lines_data = []
 				for i in f_lines:
-					start_mutations = i.find('prot_mutations')
-					start_pep_mutations = i.find('pep_mutations')
+					start_mutations = i.find('mutations')
 					scores_section = i[:start_mutations].split()
-					prot_mutations_section = \
-						i[start_mutations:start_pep_mutations].split()
-					pep_mutations_section = \
-						i[start_pep_mutations + 15:].split()
-					line_data = scores_section[1::2] + \
-						prot_mutations_section + pep_mutations_section
+					prot_mutations_section = i[start_mutations:].split()
+					line_data = scores_section[1::2] + prot_mutations_section
 					if i == f_lines[0]:
 						headline = scores_section[::2]
 					lines_data.append(line_data)
@@ -53,7 +52,7 @@ def main():
 			if f == fasc_files[0]:
 				# Making template and header
 				head_length = len(headline)
-				template = '{:50s}' + '{:25s}' * (head_length - 1) 
+				template = '{:50s}' + '{:25s}' * (head_length - 1)
 				r.write(template.format(*headline) + '\n')
 
 			# Adding in lines

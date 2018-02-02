@@ -10,13 +10,13 @@ To Do
 			Mutation type
 			Add sequence change classification, compared to cannonical sequences?
 		Borrow from Will's script to ditch CST files
-		Knock out repeat headers in condense_fasc
 		Peptides repeating in extra decoy info when designable
 		Script not picking up peptide mutations
 		Scoring issue still for res/int energies?
 		Add mutation type, group output that way for by-mutation
 		Add energies to by-mutation output
 		Use selectors to see what residues a mutant might interact with
+		double-counting peptides in design_protease?
 
 	From viewed AEPDIR_1
 		Back-convert res 56 to Q
