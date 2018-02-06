@@ -116,7 +116,7 @@ def quick_thread(destination, pose, sequences, cleaved=False, make=False):
 	return thread_files
 
 ######### Residue selection ##################################################
-def mutable_residues_selector(design_peptide=False):
+def mutable_residues_selector(design_peptide=False, single_pep_res=None):
 	"""
 	Selects the residues in a shell around the peptide using the 
 	InterGroupInterfaceByVectorSelector residue selector
@@ -126,8 +126,11 @@ def mutable_residues_selector(design_peptide=False):
 	"""
 	# Selecting regions
 	protease = ChainSelector("A")
-	variable_pep_res = ResidueIndexSelector("198-203")
 	catalytic = ResidueIndexSelector('72,96,154')
+	if single_pep_res:
+		variable_pep_res = ResidueIndexSelector(str(single_pep_res))
+	else:
+		variable_pep_res = ResidueIndexSelector("198-203")
 
 	# Making positive residue selector
 	rs = InterGroupInterfaceByVectorSelector()

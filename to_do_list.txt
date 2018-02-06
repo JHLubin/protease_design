@@ -1,22 +1,17 @@
 To Do
 	Update design protocol
+		Extend to non-HCV
 		Improve output
 			Aggregate mutation info across all models vs mutations specific to peptides
 				Common vs rare vs situational
 				Connection between mutation and specific residue in peptide sequence?
 				Look at residue type, not just letter
 				"What sores of sequences had this mutation?"
-			Collect residue mutation propensity
 			Mutation type
 			Add sequence change classification, compared to cannonical sequences?
 		Borrow from Will's script to ditch CST files
-		Peptides repeating in extra decoy info when designable
-		Script not picking up peptide mutations
 		Scoring issue still for res/int energies?
-		Add mutation type, group output that way for by-mutation
-		Add energies to by-mutation output
-		Use selectors to see what residues a mutant might interact with
-		double-counting peptides in design_protease?
+		What to do about double-designed peptide results?
 
 	From viewed AEPDIR_1
 		Back-convert res 56 to Q
@@ -26,18 +21,6 @@ To Do
 		D183K was good w/ asp 4 of peptide
 		Lysine on prime side doesn't matter
 
-	--Find cannonical (HCV) sequences 
-		Didn't find in Manasi'd paper (4?)
-		**** Lin, Chao 2006, fig 2C ****
-		Focus on 1b, exclude NS3/NS4A site
-		Efficiency: NS5A/NS5B > NA4A/NA4B >> 	NS4B/NS5A
-					EDVVCC		DEMEEC			DCSTPC
-		Others		DS I 						EYPI
-					Q							  TV
-												   S
-		Charge before CS?
-		Compare residue types in designed sequences against these
-
 	Review 2-side (prot + pep) deisgns
 		How does FastDesign compare with earlier protocol
 			Space of mutations, energies, etc.
@@ -45,17 +28,19 @@ To Do
 	Fix up MFPred
 
 Ideas
-	Test full cut/uncut list w/base HCV protease, search for correlation patterns with extracted data. Sort of like Manasi's paper.
+	Would be nice if movemap worked with residue selectors
+	Would be nice if designing with FlexPepDock didn't require flags and a resfile, had setter for score function
+	XX Test full cut/uncut list w/base HCV protease, search for correlation patterns with extracted data. Sort of like Manasi's paper.
 		Total score
 		ddG
 		Interface residue scores
 		Interface residue pair-scores
 		Scaling by residue mutation propensity?
-	Getting a sense of cleavage efficiency for known cleaved, vs. different Rosetta scores
-	Would be nice if movemap worked with residue selectors
-	Would be nice if designing with FlexPepDock didn't require flags and a resfile, had setter for score function
+	XX Getting a sense of cleavage efficiency for known cleaved, vs. different Rosetta scores
 
 Literature to seek
+	* Perona & Craik Proteins/Protein Science ~1997
+		loops in serine protease fold
 	* HTRA protease--has PDZ and protease
 		How to model two-domain + substrate in near-attack
 	* Compare a-synuclein and tau papers 
@@ -87,3 +72,19 @@ Literature to seek
 			XX Combine current scripts
 				Keep decoy generation and analysis separate, otherwise large sets become a problem
 			--Change mutations output to make columns match, separate start/end/energy change 
+			--Collect residue mutation propensity
+			--Add mutation type, group output that way for by-mutation
+			--Add energies to by-mutation output
+			--Use selectors to see what residues a mutant might interact with
+
+	--Find cannonical (HCV) sequences 
+		Didn't find in Manasi'd paper (4?)
+		**** Lin, Chao 2006, fig 2C ****
+		Focus on 1b, exclude NS3/NS4A site
+		Efficiency: NS5A/NS5B > NA4A/NA4B >> 	NS4B/NS5A
+					EDVVCC		DEMEEC			DCSTPC
+		Others		DS I 						EYPI
+					Q							  TV
+												   S
+		Charge before CS?
+		Compare residue types in designed sequences against these

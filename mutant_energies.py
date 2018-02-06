@@ -6,12 +6,18 @@ Joseph Lubin, 2017
 import argparse
 from glob import glob
 from numpy import mean
+from operator import itemgetter as iget
 from os.path import basename, join, isfile
 from pyrosetta import *
 from pyrosetta.teaching import EMapVector
 from pyrosetta.rosetta import *
 from design_protease import *
 import cPickle as pickle
+
+# Residue type positive (+), negative (-), neutral polar (N), hydrophobic (O)
+res_types = {'A':'O', 'C':'N', 'D':'-', 'E':'-', 'F':'O', 'G':'O', 
+			'H':'+', 'I':'O', 'K':'+', 'L':'O', 'M':'O', 'N':'N', 'P':'O', 
+			'Q':'N', 'R':'+', 'S':'N', 'T':'N', 'V':'O', 'W':'O', 'Y':'O'}
 
 def parse_args():
 	parser = argparse.ArgumentParser()
@@ -68,10 +74,6 @@ class mutation_collection:
 		positively charged (+), negatively charged (-), neutral-polar (N), or
 		hydrophobic (O).
 		"""
-		res_types = {'A':'O', 'C':'N', 'D':'-', 'E':'-', 'F':'O', 'G':'O', 
-			'H':'+', 'I':'O', 'K':'+', 'L':'O', 'M':'O', 'N':'N', 'P':'O', 
-			'Q':'N', 'R':'+', 'S':'N', 'T':'N', 'V':'O', 'W':'O', 'Y':'O'}
-
 		self.peptide_res_types = ''
 		self.peptide_charge = 0
 		self.peptide_polarity = 0
@@ -310,6 +312,7 @@ class mutations_aggregate:
 	"""
 	def __init__(self, mc_set):
 		self.mc_set = mc_set
+		self.design_peptide = self.mc_set[0].design_peptide
 
 		# Get full list of mutable residues (differs within the set)
 		self.residues_list = self.get_full_residue_list()
@@ -320,19 +323,20 @@ class mutations_aggregate:
 		self.actual_potential_models = [0] * self.mutable_count
 		self.mutations_counts = [0] * self.mutable_count
 
-		self.mutation_occurrences = []
-		self.mutation_res_total_energies_raw = []
-		self.mutation_res_interact_energies_raw = []
-		while len(self.mutation_occurrences) < self.mutable_count:
-			self.mutation_occurrences.append({})
-			self.mutation_res_total_energies_raw.append({})
-			self.mutation_res_interact_energies_raw.append({})
+		self.mutation_occurrences = [{} for i in range(self.mutable_count)] 
+		self.mutation_res_total_energies_raw = \
+			[{} for i in range(self.mutable_count)]
+		self.mutation_res_interact_energies_raw = \
+			[{} for i in range(self.mutable_count)]
 
 		# Populating bins
 		self.starting_residues = self.get_initial_residues()
 		self.collect_mutations_and_frequencies()
 		self.count_mutations()
 		self.condense_energies()
+
+		# Identifying residue interactions
+		self.residue_interactions = self.get_residue_interactions()
 
 		# Creating report file
 		self.pre_report = self.mc_tabulation()
@@ -465,6 +469,63 @@ class mutations_aggregate:
 				self.mutation_res_int_E_average[n][m] = \
 					min(self.mutation_res_interact_energies_raw[n][m])
 
+	def get_residue_interactions(self):
+		""" 
+		Looks at each mutation_collection and runs a residue 
+		selector specific to each residue on the peptide, then converts 
+		from a list of what mutable residues interact with each peptide 
+		residue to a list of with which peptide residues each mutable residue 
+		can interact. mutable_residues_selector and selector_to_list are from 
+		design_protease.
+		"""
+		peptide_residues = range(198, 204)
+		res_selectors = [mutable_residues_selector(single_pep_res=i) 
+			for i in peptide_residues]
+		pep_res_partners = [[] for i in peptide_residues]
+
+		# Looking at each mutation_collection and running a residue selector
+		for mc in self.mc_set:
+			pose = pose_from_pdb(mc.threaded_pdb)
+			for n, rs in enumerate(res_selectors):
+				selection = selector_to_list(pose, rs)
+				for i in selection:
+					if i not in pep_res_partners[n]:
+						pep_res_partners[n].append(i)
+
+		# Switching from pep->mutable to mutable->pep
+		int_size = self.mutable_count
+		if self.design_peptide:
+			int_size -= len(peptide_residues)
+		residue_interactions = [[] for i in range(int_size)]
+
+		for n, i in enumerate(pep_res_partners):
+			i.sort()
+			for j in i:
+				ind = self.residues_list.index(j)
+				residue_interactions[ind].append(peptide_residues[n])
+
+		if self.design_peptide: 
+			print residue_interactions + pep_res_partners
+			return residue_interactions + pep_res_partners	
+		else: 
+			return residue_interactions	
+
+	def string_interactions_together(self, position):
+		""" Concatenates a list of interactable residues to a string """
+		number_position = {'198':'p6', '199':'p5', '200':'p4',  
+							'201':'p3', '202':'p2', '203':'p1'}
+
+		partners = self.residue_interactions[position]
+		partners_as_str = [str(i) for i in partners]
+
+		for n, i in enumerate(partners_as_str):
+			if i in number_position:
+				partners_as_str[n] = number_position[i]
+
+		partners_as_str.sort()
+
+		return ','.join(partners_as_str)
+
 	def back_convert_N_A_B(self, index, end_res):
 		""" 
 		Function to convert back to the mutation format in mutation_collection 
@@ -475,21 +536,48 @@ class mutations_aggregate:
 		mut_string = '_'.join([locus, initial_res, end_res])
 		return mut_string
 
-	def extract_mut_info(self, mutation_collection, mutation):
+	def extract_start_res_info(self, res, n_mut, n_tot):
+		"""
+		Pulls information about a residue/position prior to design
+		"""
+		mut_line_out = []
+		mut_line_out.append(res)
+		mut_line_out.append(res_types[res])
+		occurrence = round(float(n_mut) / n_tot, 3)
+		mut_line_out.append(str(occurrence))
+
+		return mut_line_out
+
+	def extract_end_mut_info(self, mutation_collection, mutation):
 		""" 
 		Pulls report information about a specific mutation from a 
 		mutation_collection object.
 		"""
+		m_ind = mutation_collection.mutations.index(mutation)
+
 		mc_extract = []
 		mc_extract.append(mutation_collection.short_sequence)
 		t = '\'' + mutation_collection.peptide_res_types + '\''
 		mc_extract.append(t)
-		mc_extract.append(str(mutation_collection.peptide_charge))
-		mc_extract.append(str(mutation_collection.peptide_polarity))
-		m_ind = mutation_collection.mutations.index(mutation)
+		res_dE = round(mutation_collection.mut_res_average_e[m_ind], 3)
+		mc_extract.append(str(res_dE))
+		res_int_dE = round(mutation_collection.mut_int_average_e[m_ind], 3)
+		mc_extract.append(str(res_int_dE))
 		mc_extract.append(str(mutation_collection.mut_rate[m_ind]))
 
 		return mc_extract
+
+	def get_line_length(self, line):
+		"""
+		Determines the number of elements that will be written to a report 
+		line. Each line is a list, though the last element may be a list of 
+		lists. There are three layers. The output result is the number of 
+		non-list elements across all three layers
+		"""
+		outer = sum([1 for i in line if type(i) is not list])
+		middle = sum([1 for i in line[-1][0] if type(i) is not list])
+		inner = len(line[-1][0][-1][0])
+		return outer + middle + inner
 
 	def mc_tabulation(self):
 		""" 
@@ -502,6 +590,7 @@ class mutations_aggregate:
 		file.
 		"""
 		pre_output_list = []
+		is_first = True
 		for n, i in enumerate(self.mutation_occurrences):
 			loc = self.residues_list[n]
 			initial = self.starting_residues[n]
@@ -511,6 +600,7 @@ class mutations_aggregate:
 
 			line_out = []
 			line_out.append(str(loc))
+			line_out.append(self.string_interactions_together(n))
 			line_out.append(initial)
 
 			if propensity == 0:
@@ -519,23 +609,31 @@ class mutations_aggregate:
 				pre_output_list.append(line_out)
 
 			else:
+				if initial == 'var':
+					line_out.append('var')
+				else:
+					line_out.append(res_types[initial])
 				line_out.append(str(propensity) + dr_for_all_models * '*')
 				line_out.append([])
 				for j in i:
-					mut_line_out = []
-					mut_line_out.append(j)
-					occurrence = round(float(i[j]) / potential, 3)
-					mut_line_out.append(str(occurrence))	
+					mut_line_out = \
+						self.extract_start_res_info(j, i[j], potential)
 					mut_line_out.append([])	
 
 					mc_mut = self.back_convert_N_A_B(n, j)
 					for mc in self.mc_set:
 						if mc_mut in mc.mutations:
-							mc_extract = self.extract_mut_info(mc, mc_mut)
+							mc_extract = self.extract_end_mut_info(mc, mc_mut)
 							mut_line_out[-1].append(mc_extract)
 
 					line_out[-1].append(mut_line_out)
+
 				pre_output_list.append(line_out)
+
+				# Determining the length of the output string the first time through
+				if is_first:
+					self.output_length = self.get_line_length(line_out[:])
+					is_first = False
 
 		return pre_output_list
 
@@ -552,18 +650,22 @@ class mutations_aggregate:
 
 			# Mutations
 			else:
-				for mutation in line[3]:
-					for s in mutation[2]:
-						if s == mutation[2][0]:
-							second_part = mutation[:2]
-							if mutation == line[3][0]:
-								first_part = line[:3]
-							else:
-								first_part = ['=""'] * 3
-						else:
-							first_part = ['=""'] * 3
-							second_part = ['=""'] * 2
+				# Sorting
+				line[-1] = sorted(line[-1], key=iget(1, 2), reverse=True)
 
+				# Converting from list to lines
+				for mutation in line[-1]:
+					# Sorting
+					mutation[-1] = sorted(mutation[-1], key=iget(2))
+
+					# Converting from list to lines
+					for s in mutation[-1]:
+						first_part = ['=""'] * len(line[:-1])
+						second_part = ['=""'] * len(mutation[:-1])
+						if s == mutation[-1][0]:
+							second_part = mutation[:-1]
+							if mutation == line[-1][0]:
+								first_part = line[:-1]
 						third_part = s
 
 						cleaned_table.append(first_part + second_part + 
@@ -581,11 +683,11 @@ def aggregated_report(name, mc_set):
 	# Get full list of residues that could have been mutated
 	ma = mutations_aggregate(mc_set)
 
-	line_length = 10
-	template = '{:10s}' * line_length + '\n'
-	header = ['location', 'start_AA', 'mut_prob', 'final_AA', 'rel_prob', 
-				'pep_seq', 'seq_class', 'seq_+/-', 'seq_polar', 
-				'mut_prob_by_seq']
+	line_length = ma.output_length
+	template = '{:12s}' * line_length + '\n'
+	header = ['location', 'interacts', 'start_AA', 'start_type', 'mut_prob', 
+				'final_AA', 'end_type', 'rel_prob', 'pep_seq', 'seq_class', 
+				'res_energy', 'int_energy', 'mut_prob_by_seq']
 
 	with open(name, 'w') as r:
 		r.write(template.format(*header))
