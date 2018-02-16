@@ -24,6 +24,8 @@ def parse_args():
 	parser.add_argument("folder", help="Pick folder to check")
 	parser.add_argument("-des_pep", "--design_peptide", action = "store_true", 
 		help="Expand residue selection to peptide, not just protease")
+	parser.add_argument("-eval", "--force_evaluate", action = "store_true", 
+		help="Re-evaluate decoys")
 	args = parser.parse_args()
 	return args
 
@@ -64,7 +66,9 @@ class mutation_collection:
 		# Getting mutation frequencies, energy averages
 		self.mut_rate = \
 			[round(float(i)/self.decoy_count,3) for i in self.mut_freq]
+		self.mut_res_min_e = [min(i) for i in self.mut_res_es]
 		self.mut_res_average_e = [mean(i) for i in self.mut_res_es]
+		self.mut_int_min_e = [min(i) for i in self.mut_int_es]
 		self.mut_int_average_e = [mean(i) for i in self.mut_int_es]
 
 	##########################################################################
@@ -107,9 +111,6 @@ class mutation_collection:
 		self.short_sequence = self.sequence[1:7]
 		self.classify_residues()
 		print self.short_sequence
-		print self.peptide_res_types
-		print "Peptide charge:", self.peptide_charge
-		print "Peptide polarity:", self.peptide_polarity
 
 	def collect_models(self):
 		""" Collects threaded, designed, and relaxed decoys """
@@ -160,33 +161,84 @@ class mutation_collection:
 
 		return start_res_name, end_res_name, mut_string
 		
-	def interact_energy(self, pose, res, interaction_set):
+	#def interact_energy(self, pose, res, interaction_set):
+		#""" 
+		#Takes a given pose, residue, and set of interaction residues to check 
+		#against, and sums the weighted residue-pair interaction energies 
+		#between the input residue and each member of the interaction set.
+		#ref_wts from design_protease.
+		#"""
+		## Collecting interaction energies
+		#sum_int_energy = 0
+		#r1 = pose.residue(res)
+		#print res
+		#for i in interaction_set:
+		#	r2 = pose.residue(i)
+		#
+		#	# Getting emap
+		#	emap = EMapVector()
+		#	self.sf.eval_ci_2b(r1, r2, pose, emap) # Includes many zero terms
+		#
+		#	# Cleaning up emap
+		#	org_emp = {}
+		#	emap_nz = str(emap.show_nonzero()).split()
+		#	for j in range(len(emap_nz)/2): # Converting to a dict
+		#		org_emp[emap_nz[2 * j].rstrip(':')] = float(emap_nz[2 * j + 1])
+		#
+		#	# Adding weighted scores
+		#	for j in org_emp:
+		#		if j in ref_wts: # Emap contains terms with 0 weight in REF
+		#			sum_int_energy += org_emp[j] * ref_wts[j]
+		#
+		#return sum_int_energy
+
+	#def residue_pairwise_energy(self, res, before, after):
+		#""" 
+		#Theis function determines whether a mutation is on the protease or  
+		#peptide, and conversely the relevant set of residues contributing to 
+		#the mutated residue's score. Then it runs interact_energy accordingly
+		#on the residue in the relaxed and designed poses, and calculates the
+		#difference.
+		#"""
+		#if res in self.pep_res:
+		#	mut_loc = 'Peptide'
+		#	partner = self.des_res
+		#else:
+		#	mut_loc = 'Protease'
+		#	partner = self.pep_res
+		#
+		## Getting sum residue interaction energy with contact residues
+		#res_start_int_e = self.interact_energy(before, res, partner)
+		#res_end_int_e = self.interact_energy(after, res, partner)
+		#res_delta_int_e = res_end_int_e - res_start_int_e
+		#
+		#return mut_loc, res_delta_int_e
+
+	def res_interact_energy(self, pose, res1, res2):
 		""" 
-		Takes a given pose, residue, and set of interaction residues to check 
-		against, and sums the weighted residue-pair interaction energies 
-		between the input residue and each member of the interaction set.
+		Takes a given pose and residue pair, and sums the weighted residue-pair 
+		interaction energies between the two.
 		ref_wts from design_protease.
 		"""
 		# Collecting interaction energies
 		sum_int_energy = 0
-		r1 = pose.residue(res)
-		for i in interaction_set:
-			r2 = pose.residue(i)
+		r1 = pose.residue(res1)
+		r2 = pose.residue(res2)
 
-			# Getting emap
-			emap = EMapVector()
-			self.sf.eval_ci_2b(r1, r2, pose, emap) # Includes many zero terms
+		# Getting emap
+		emap = EMapVector()
+		self.sf.eval_ci_2b(r1, r2, pose, emap) # Includes many zero terms
 
-			# Cleaning up emap
-			org_emp = {}
-			emap_nz = str(emap.show_nonzero()).split()
-			for j in range(len(emap_nz)/2): # Converting to a dict
-				org_emp[emap_nz[2 * j].rstrip(':')] = float(emap_nz[2 * j + 1])
+		# Cleaning up emap
+		org_emp = {}
+		emap_nz = str(emap.show_nonzero()).split()
+		for i in range(len(emap_nz)/2): # Converting to a dict
+			org_emp[emap_nz[2 * i].rstrip(':')] = float(emap_nz[2 * i + 1])
 
-			# Adding weighted scores
-			for j in org_emp:
-				if j in ref_wts: # Emap contains terms with 0 weight in REF
-					sum_int_energy += org_emp[j] * ref_wts[j]
+		# Adding weighted scores
+		for sc_term in org_emp:
+			if sc_term in ref_wts: # Emap contains terms with 0 weight in REF
+				sum_int_energy += org_emp[sc_term] * ref_wts[sc_term]
 
 		return sum_int_energy
 
@@ -196,7 +248,10 @@ class mutation_collection:
 		peptide, and conversely the relevant set of residues contributing to 
 		the mutated residue's score. Then it runs interact_energy accordingly
 		on the residue in the relaxed and designed poses, and calculates the
-		difference.
+		difference. Returns the location of the mutation, the residue 
+		interaction energy change between the relaxed and designed models, 
+		and a list of the residues for which the interaction energy was 
+		nonzero.
 		"""
 		if res in self.pep_res:
 			mut_loc = 'Peptide'
@@ -206,11 +261,17 @@ class mutation_collection:
 			partner = self.pep_res
 
 		# Getting sum residue interaction energy with contact residues
-		res_start_int_e = self.interact_energy(before, res, partner)
-		res_end_int_e = self.interact_energy(after, res, partner)
-		res_delta_int_e = res_end_int_e - res_start_int_e
+		# and residue contact list
+		int_e_sum = 0
+		contacts = []
+		for n, p in enumerate(partner):
+			res_start_int_e = self.res_interact_energy(before, res, p)
+			res_end_int_e = self.res_interact_energy(after, res, p)
+			res_delta_int_e = res_end_int_e - res_start_int_e
+			int_e_sum += res_delta_int_e
+			contacts.append(partner[n])
 
-		return mut_loc, res_delta_int_e
+		return mut_loc, int_e_sum, contacts
 
 	def ident_mutations(self, rel_pdb, des_pdb):
 		"""
@@ -295,8 +356,8 @@ def mutations_by_seq_report(name, mc, head=False):
 	for i in range(len(mc.mutations)):
 		line = [str(j) for j in [mc.cleaved, mc.sequence, 
 				mc.mut_location[i], mc.mutations[i], mc.mut_rate[i], 
-				round(mc.mut_res_average_e[i], 3), 
-				round(mc.mut_int_average_e[i], 3)]]
+				round(mc.mut_res_min_e[i], 3), 
+				round(mc.mut_int_min_e[i], 3)]]
 		report_lines.append(line)
 	report_lines.sort()
 
@@ -453,9 +514,7 @@ class mutations_aggregate:
 		bin_set = ['mutation_res_tot_E_average', 'mutation_res_int_E_average',
 					'mutation_res_tot_E_min', 'mutation_res_int_E_min']
 		for i in bin_set:
-			bin = []
-			while len(bin) < self.mutable_count:
-				bin.append({})
+			bin = [{} for x in range(self.mutable_count)]
 			setattr(self, i, bin)
 
 		for n, pos in enumerate(self.mutation_occurrences):
@@ -559,9 +618,9 @@ class mutations_aggregate:
 		mc_extract.append(mutation_collection.short_sequence)
 		t = '\'' + mutation_collection.peptide_res_types + '\''
 		mc_extract.append(t)
-		res_dE = round(mutation_collection.mut_res_average_e[m_ind], 3)
+		res_dE = round(mutation_collection.mut_res_min_e[m_ind], 3)
 		mc_extract.append(str(res_dE))
-		res_int_dE = round(mutation_collection.mut_int_average_e[m_ind], 3)
+		res_int_dE = round(mutation_collection.mut_int_min_e[m_ind], 3)
 		mc_extract.append(str(res_int_dE))
 		mc_extract.append(str(mutation_collection.mut_rate[m_ind]))
 
@@ -651,7 +710,7 @@ class mutations_aggregate:
 			# Mutations
 			else:
 				# Sorting
-				line[-1] = sorted(line[-1], key=iget(1, 2), reverse=True)
+				line[-1] = sorted(line[-1], key=iget(1, 0), reverse=True)
 
 				# Converting from list to lines
 				for mutation in line[-1]:
@@ -720,7 +779,7 @@ def main():
 	# Checking if analysis has already been run and pickled
 	pickle_name = join(folder, folder.rstrip('/') + '_mutations.pkl')
 
-	if not isfile(pickle_name):
+	if args.force_evaluate or not isfile(pickle_name):
 		# Simultaneously analyzing and writing to by-sequence report
 		seq_mutants = []
 		report_name = join(folder, folder.rstrip('/') + '_mutation_summary.txt')

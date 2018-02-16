@@ -1,17 +1,75 @@
 To Do
 	Update design protocol
 		Extend to non-HCV
-		Improve output
-			Aggregate mutation info across all models vs mutations specific to peptides
-				Common vs rare vs situational
-				Connection between mutation and specific residue in peptide sequence?
-				Look at residue type, not just letter
-				"What sores of sequences had this mutation?"
-			Mutation type
-			Add sequence change classification, compared to cannonical sequences?
+		"What sorts of sequences had this mutation?"
+		Add sequence change classification, compared to cannonical sequences?
 		Borrow from Will's script to ditch CST files
-		Scoring issue still for res/int energies?
 		What to do about double-designed peptide results?
+		Output which PDB to check for example of mutation
+		Add further constraints to keep peptide in b-sheet
+			Manasi emphasized stronger importnce of constraint scores
+		Add cleaved/uncleaved indicator to sequences in by-mutation output
+
+New protocol
+	Loop hashing, starting with fixed ends
+	Need database of protease loops
+		serine-like proteases
+		check database for loops of length X that match end orientations
+	Variable length build option?
+	Mike Tyka, splice mover (Fleishman @ Weitzman Institute)
+	Protocol
+		centroid
+			Randomly pick loop siza
+			Find suitable loops in database, splice in
+		full-atom
+			redesign interface with new loop around peptide
+			rescore
+			accept/reject
+		Swap loops until things aren't improving much. Filter?
+		If this overly favors long loops, alternative "hot spot" approach:
+			Define hot spots and constrain a hot interaction
+			Inverse rotamer sampling
+			Backbone moved to accommodate the rotamer
+			(Need to figure out which mover does this)
+	Thoughts
+		Assessment of loop  (and full structure) flexibility, since part of loop role is in determining rigidity of the catalytic site, part in attracting the substrate, and part in positioning it
+		Can we share loops across different types of protease, or even with wider PDB?
+		Maybe jump peptide away, then insert loop, check about structure change, then put peptide back in --> filter
+		Try peptide binding without constraints vs with constraints? Up CST weights?
+		Water-mediation?
+		Do we want a database of serine protease mutations?
+		Assemble a list of experimental methods, compare to Manasi's?
+		Funny thing about orientation, see fig 3
+		Competitive in vitro test -- multiple discriminble peptides with designed protease, assess cleavage propensity--quantitative comparison
+
+Ideas
+	Would be nice if movemap worked with residue selectors
+	Would be nice if designing with FlexPepDock didn't require flags and a resfile, had setter for score function
+	XX Test full cut/uncut list w/base HCV protease, search for correlation patterns with extracted data. Sort of like Manasi's paper.
+		Total score
+		ddG
+		Interface residue scores
+		Interface residue pair-scores
+		Scaling by residue mutation propensity?
+	XX Getting a sense of cleavage efficiency for known cleaved, vs. different Rosetta scores
+
+Literature to seek
+	--Perona & Craik Proteins/Protein Science 1995, 1997
+		loops in serine protease fold
+	* HTRA protease--has PDZ and protease
+		How to model two-domain + substrate in near-attack
+	* Compare a-synuclein and tau papers 
+	Neurosin or cathepsin expression
+	Note, collagenase structures referenced in Perona&Craik
+
+Collect data on
+	Assays for specificity determination
+	Engineered proteases for altered specificity
+		Mutations and efficacy
+	Trypsin-like proteases
+		Count interactions of a loop with peptide vs with the rest of the protease
+		Assess how happy new loop would be in a splice
+		Filter out ones that would really lose their original conformation
 
 	From viewed AEPDIR_1
 		Back-convert res 56 to Q
@@ -26,25 +84,6 @@ To Do
 			Space of mutations, energies, etc.
 
 	Fix up MFPred
-
-Ideas
-	Would be nice if movemap worked with residue selectors
-	Would be nice if designing with FlexPepDock didn't require flags and a resfile, had setter for score function
-	XX Test full cut/uncut list w/base HCV protease, search for correlation patterns with extracted data. Sort of like Manasi's paper.
-		Total score
-		ddG
-		Interface residue scores
-		Interface residue pair-scores
-		Scaling by residue mutation propensity?
-	XX Getting a sense of cleavage efficiency for known cleaved, vs. different Rosetta scores
-
-Literature to seek
-	* Perona & Craik Proteins/Protein Science ~1997
-		loops in serine protease fold
-	* HTRA protease--has PDZ and protease
-		How to model two-domain + substrate in near-attack
-	* Compare a-synuclein and tau papers 
-	Neurosin or cathepsin expression
 
 	##########################################################################
 	Complete
@@ -76,6 +115,12 @@ Literature to seek
 			--Add mutation type, group output that way for by-mutation
 			--Add energies to by-mutation output
 			--Use selectors to see what residues a mutant might interact with
+			--Use min instead of average in first mutants analysis
+			--Common vs rare vs situational
+			--Look at residue type, not just letter
+			--Aggregate mutation info across all models vs mutations specific to peptides
+			--Connection between mutation and specific residue in peptide sequence?
+			--Mutation type
 
 	--Find cannonical (HCV) sequences 
 		Didn't find in Manasi'd paper (4?)
