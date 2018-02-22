@@ -89,7 +89,7 @@ def get_seq_list(seq_arg):
 			if len(s) == 6: # Hard code for HCV
 				s = 'A' + s + 'SMHL'
 			else:
-				assert len(s) = 11
+				assert len(s) == 11
 
 	return pep_sequences
 

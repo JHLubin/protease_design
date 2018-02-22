@@ -9,6 +9,7 @@ To Do
 		Add further constraints to keep peptide in b-sheet
 			Manasi emphasized stronger importnce of constraint scores
 		Add cleaved/uncleaved indicator to sequences in by-mutation output
+		Insert blank lines between sets in by-set mutations and condense_fasc
 
 New protocol
 	Loop hashing, starting with fixed ends
@@ -33,7 +34,7 @@ New protocol
 			(Need to figure out which mover does this)
 	Thoughts
 		Assessment of loop  (and full structure) flexibility, since part of loop role is in determining rigidity of the catalytic site, part in attracting the substrate, and part in positioning it
-		Can we share loops across different types of protease, or even with wider PDB?
+		XX(for now)Can we share loops across different types of protease, or even with wider PDB?
 		Maybe jump peptide away, then insert loop, check about structure change, then put peptide back in --> filter
 		Try peptide binding without constraints vs with constraints? Up CST weights?
 		Water-mediation?
