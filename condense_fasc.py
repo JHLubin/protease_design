@@ -21,7 +21,7 @@ def main():
 
 	# Getting fasc files
 	folder = args.directory
-	folder_search = join(folder,"*.fasc")
+	folder_search = join(folder, "*.fasc")
 	fasc_files = glob(folder_search)
 	fasc_files.sort()
 	# Prevent self-reference if re-running
@@ -47,7 +47,7 @@ def main():
 					if i == f_lines[0]:
 						headline = scores_section[::2]
 					lines_data.append(line_data)
-				lines_data.sort()
+				lines_data.sort(key=lambda x: x[1]) # Sorting by total score
 
 			if f == fasc_files[0]:
 				# Making template and header

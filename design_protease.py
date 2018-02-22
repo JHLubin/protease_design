@@ -85,6 +85,12 @@ def get_seq_list(seq_arg):
 			# Sequence was typed directly into the argument
 			pep_sequences.append(inp.strip())
 
+		for s in pep_sequences:
+			if len(s) == 6: # Hard code for HCV
+				s = 'A' + s + 'SMHL'
+			else:
+				assert len(s) = 11
+
 	return pep_sequences
 
 

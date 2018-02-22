@@ -1,0 +1,78 @@
+DAMEEC
+uncleaved 2 DPMEEC
+
+DEMEEC
+uncleaved 2 DPMEEC
+
+DKMEEC
+uncleaved 2 DPMEEC
+
+DLEVVT
+uncleaved 1 CLEVVT
+uncleaved 1 ELEVVT
+uncleaved 1 FLEVVT
+uncleaved 1 GLEVVT
+uncleaved 1 HLEVVT
+uncleaved 1 LLEVVT
+uncleaved 1 MLEVVT
+uncleaved 1 PLEVVT
+uncleaved 1 QLEVVT
+uncleaved 1 RLEVVT
+uncleaved 1 TLEVVT
+uncleaved 1 VLEVVT
+uncleaved 1 WLEVVT
+uncleaved 1 YLEVVT
+uncleaved 2 DCEVVT
+uncleaved 2 DDEVVT
+uncleaved 2 DEEVVT
+uncleaved 2 DFEVVT
+uncleaved 2 DGEVVT
+uncleaved 2 DHEVVT
+uncleaved 2 DIEVVT
+uncleaved 2 DKEVVT
+uncleaved 2 DMEVVT
+uncleaved 2 DNEVVT
+uncleaved 2 DPEVVT
+uncleaved 2 DQEVVT
+uncleaved 2 DREVVT
+uncleaved 2 DSEVVT
+uncleaved 2 DTEVVT
+uncleaved 2 DVEVVT
+uncleaved 2 DWEVVT
+uncleaved 2 DYEVVT
+
+DRMEEC
+uncleaved 2 DPMEEC
+
+DSVICC
+uncleaved 5 DSVIDC
+
+DYMEEC
+uncleaved 2 DPMEEC
+
+ECTTPC
+uncleaved 1 ACTTPC
+uncleaved 1 CCTTPC
+uncleaved 1 FCTTPC
+uncleaved 1 GCTTPC
+uncleaved 1 HCTTPC
+uncleaved 1 KCTTPC
+uncleaved 1 LCTTPC
+uncleaved 1 NCTTPC
+uncleaved 1 PCTTPC
+uncleaved 1 RCTTPC
+uncleaved 1 TCTTPC
+uncleaved 2 EATTPC
+uncleaved 2 EGTTPC
+uncleaved 2 EPTTPC
+
+ESTTPC
+uncleaved 2 EATTPC
+uncleaved 2 EGTTPC
+uncleaved 2 EPTTPC
+
+NCSTPC
+uncleaved 3 NCTTPC
+
+NPEVVT
+uncleaved 1 DPEVVT

@@ -1,0 +1,1280 @@
+AEMEEC
+        DPMEEC
+
+DAMEEC
+        DPMEEC
+
+DASTPC
+        EATTPC
+
+DAVVCC
+        DLVVIC
+
+DCPVPC
+        DREVPC
+        ECEVPC
+
+DCSTPC
+        ACTTPC
+        CCTTPC
+        FCTTPC
+        GCTTPC
+        HCTTPC
+        KCTTPC
+        LCTTPC
+        NCTTPC
+        PCTTPC
+        RCTTPC
+        TCTTPC
+
+DCTAPC
+        ACTTPC
+        CCTTPC
+        FCTTPC
+        GCTTPC
+        HCTTPC
+        KCTTPC
+        LCTTPC
+        NCTTPC
+        PCTTPC
+        RCTTPC
+        TCTTPC
+
+DCVVPC
+        DLVVIC
+        DREVPC
+        ECEVPC
+
+DDIVPC
+        DREVPC
+        EDEVPC
+
+DDVVCC
+        DLVVIC
+
+DEAEEC
+        DPMEEC
+
+DEFEEC
+        DPMEEC
+
+DEMAEC
+        DPMEEC
+
+DEMEAC
+        DPMEEC
+
+DEMEDC
+        DPMEEC
+
+DEMEEC
+        DPMEEC
+
+DEMEEL
+        DPMEEC
+        DPMEEC
+
+DEMEEN
+        DPMEEC
+        DPMEEC
+
+DEMEET
+        DPMEEC
+        DPMEEC
+
+DEMEEV
+        DPMEEC
+        DPMEEC
+
+DEMEFC
+        DPMEEC
+
+DEMEGC
+        DPMEEC
+
+DEMEKC
+        DPMEEC
+        DQMWKC
+
+DEMENC
+        DPMEEC
+
+DEMEPC
+        DPMEEC
+
+DEMFEC
+        DPMEEC
+
+DEMKEC
+        DPMEEC
+
+DEMNEC
+        DPMEEC
+
+DEMTEC
+        DPMEEC
+
+DEMVEC
+        DPMEEC
+
+DKMEEC
+        DPMEEC
+
+DLAVVT
+        CLEVVT
+        DCEVVT
+        DDEVVT
+        DEEVVT
+        DFEVVT
+        DGEVVT
+        DHEVVT
+        DIEVVT
+        DKEVVT
+        DLYLVT
+        DMEVVT
+        DNEVVT
+        DPEVVT
+        DQEVVT
+        DREVVT
+        DSEVVT
+        DTEVVT
+        DVEVVT
+        DWEVVT
+        DYEVVT
+        ELEVVT
+        FLEVVT
+        GLEVVT
+        HLEVVT
+        LLEVVT
+        MLEVVT
+        PLEVVT
+        QLEVVT
+        RLEVVT
+        TLEVVT
+        VLEVVT
+        WLEVVT
+        YLEVVT
+
+DLEAVT
+        CLEVVT
+        DCEVVT
+        DDEVVT
+        DEEVVT
+        DFEVVT
+        DGEVVT
+        DHEVVT
+        DIEVVT
+        DKEVVT
+        DLYLVT
+        DMEVVT
+        DNEVVT
+        DPEVVT
+        DQEVVT
+        DREVVT
+        DSEVVT
+        DTEVVT
+        DVEVVT
+        DWEVVT
+        DYEVVT
+        ELEVVT
+        FLEVVT
+        GLEVVT
+        HLEVVT
+        LLEVVT
+        MLEVVT
+        PLEVVT
+        QLEVVT
+        RLEVVT
+        TLEVVT
+        VLEVVT
+        WLEVVT
+        YLEVVT
+
+DLEVAT
+        CLEVVT
+        DCEVVT
+        DDEVVT
+        DEEVVT
+        DFEVVT
+        DGEVVT
+        DHEVVT
+        DIEVVT
+        DKEVVT
+        DMEVVT
+        DNEVVT
+        DPEVVT
+        DQEVVT
+        DREVVT
+        DSEVVT
+        DTEVAA
+        DTEVAA
+        DTEVVT
+        DVEVVT
+        DWEVVT
+        DYEVVT
+        ELEVVT
+        FLEVVT
+        GLEVVT
+        HLEVVT
+        LLEVVT
+        MLEVVT
+        PLEVVT
+        QLEVVT
+        RLEVVT
+        TLEVVT
+        VLEVVT
+        WLEVVT
+        YLEVVT
+
+DLEVIT
+        CLEVVT
+        DCEVVT
+        DDEVVT
+        DEEVVT
+        DFEVVT
+        DGEVVT
+        DHEVVT
+        DIEVVT
+        DKEVVT
+        DLVVIC
+        DLVVIC
+        DMEVVT
+        DNEVVT
+        DPEVVT
+        DQEVVT
+        DREVVT
+        DSEVVT
+        DTEVVT
+        DVEVVT
+        DWEVVT
+        DYEVVT
+        ELEVVT
+        FLEVVT
+        GLEVVT
+        HLEVVT
+        LLEVVT
+        MLEVVT
+        PLEVIK
+        PLEVIK
+        PLEVVT
+        QLEVVT
+        RLEVVT
+        TLEVVT
+        VLEVVT
+        WLEVVT
+        YLEVVT
+
+DLEVMT
+        CLEVVT
+        DCEVVT
+        DDEVVT
+        DEEVVT
+        DFEVVT
+        DGEVVT
+        DHEVVT
+        DIEVVT
+        DKEVVT
+        DMEVVT
+        DNEVVT
+        DPEVVT
+        DQEVVT
+        DREVVT
+        DSEVVT
+        DTEVVT
+        DVEVVT
+        DWEVVT
+        DYEVVT
+        ELEVVT
+        FLEVVT
+        GLEVVT
+        HLEVVT
+        LLEVVT
+        MLEVVT
+        PLEVVT
+        QLEVVT
+        RLEVVT
+        TLEVVT
+        VLEVVT
+        WLEVVT
+        YLEVVT
+
+DLEVTT
+        CLEVVT
+        DCEVVT
+        DDEVVT
+        DEEVVT
+        DFEVVT
+        DGEVVT
+        DHEVVT
+        DIEVVT
+        DKEVVT
+        DMEVVT
+        DNEVVT
+        DPEVVT
+        DQEVVT
+        DREVVT
+        DSEVVT
+        DTEVVT
+        DVEVVT
+        DWEVVT
+        DYEVVT
+        ELEVVT
+        FLEVVT
+        GLEVVT
+        HLEVVT
+        LLEVVT
+        MLEVVT
+        PLEVVT
+        QLEVVT
+        RLEVVT
+        TLEVVT
+        VLEVVT
+        WLEVVT
+        YLEVVT
+
+DLEVVA
+        CLEVVT
+        CLEVVT
+        DCEVVT
+        DCEVVT
+        DDEVVT
+        DDEVVT
+        DEEVVT
+        DEEVVT
+        DFEVVT
+        DFEVVT
+        DGEVVT
+        DGEVVT
+        DHEVVT
+        DHEVVT
+        DIEVVT
+        DIEVVT
+        DKEVVT
+        DKEVVT
+        DMEVVT
+        DMEVVT
+        DNEVVT
+        DNEVVT
+        DPEVVT
+        DPEVVT
+        DQEVVT
+        DQEVVT
+        DREVVT
+        DREVVT
+        DSEVVT
+        DSEVVT
+        DTEVAA
+        DTEVVT
+        DTEVVT
+        DVEVVT
+        DVEVVT
+        DVVVVA
+        DWEVVT
+        DWEVVT
+        DYEVVT
+        DYEVVT
+        ELEVVT
+        ELEVVT
+        FLEVVT
+        FLEVVT
+        GLEVVT
+        GLEVVT
+        HLEVVT
+        HLEVVT
+        LLEVVT
+        LLEVVT
+        MLEVVT
+        MLEVVT
+        PLEVVT
+        PLEVVT
+        QLEVVT
+        QLEVVT
+        RLEVVT
+        RLEVVT
+        TLEVVT
+        TLEVVT
+        VLEVVT
+        VLEVVT
+        WLEVVT
+        WLEVVT
+        YLEVVT
+        YLEVVT
+
+DLEVVC
+        CLEVVT
+        CLEVVT
+        DCEVVT
+        DCEVVT
+        DDEVVT
+        DDEVVT
+        DEEVVT
+        DEEVVT
+        DFEVVT
+        DFEVVT
+        DGEVVT
+        DGEVVT
+        DHEVVT
+        DHEVVT
+        DIEVVT
+        DIEVVT
+        DKEVVT
+        DKEVVT
+        DLVVIC
+        DMEVVT
+        DMEVVT
+        DNEVVT
+        DNEVVT
+        DPEVVT
+        DPEVVT
+        DQEVVT
+        DQEVVT
+        DREVPC
+        DREVVT
+        DREVVT
+        DSEVVT
+        DSEVVT
+        DTEVVT
+        DTEVVT
+        DVEVVT
+        DVEVVT
+        DWEVVT
+        DWEVVT
+        DYEVVT
+        DYEVVT
+        ELEVPC
+        ELEVVT
+        ELEVVT
+        FLEVVT
+        FLEVVT
+        GLEVVT
+        GLEVVT
+        HLEVVT
+        HLEVVT
+        LLEVVT
+        LLEVVT
+        MLEVVT
+        MLEVVT
+        PLEVVT
+        PLEVVT
+        QLEVVT
+        QLEVVT
+        RLEVVT
+        RLEVVT
+        TLEVVT
+        TLEVVT
+        VLEVVT
+        VLEVVT
+        WLEVVT
+        WLEVVT
+        YLEVVT
+        YLEVVT
+
+DLEVVD
+        CLEVVT
+        CLEVVT
+        DCEVVT
+        DCEVVT
+        DDEVVT
+        DDEVVT
+        DEEVVT
+        DEEVVT
+        DFEVVT
+        DFEVVT
+        DGEVVT
+        DGEVVT
+        DHEVVT
+        DHEVVT
+        DIEVVT
+        DIEVVT
+        DKEVVT
+        DKEVVT
+        DLEDRD
+        DMEVVT
+        DMEVVT
+        DNEVVT
+        DNEVVT
+        DPEVVT
+        DPEVVT
+        DQEVVT
+        DQEVVT
+        DREVVT
+        DREVVT
+        DSEVVT
+        DSEVVT
+        DTEVVT
+        DTEVVT
+        DVEVVT
+        DVEVVT
+        DWEVVT
+        DWEVVT
+        DYEVVT
+        DYEVVT
+        ELEVVT
+        ELEVVT
+        FLEVVT
+        FLEVVT
+        GLEVVT
+        GLEVVT
+        HLEVVT
+        HLEVVT
+        LLEVVT
+        LLEVVT
+        MLEVVT
+        MLEVVT
+        PLEVVT
+        PLEVVT
+        QLEVVT
+        QLEVVT
+        RLEVVT
+        RLEVVT
+        TLEVVT
+        TLEVVT
+        VLEVVT
+        VLEVVT
+        WLEVVT
+        WLEVVT
+        YLEVVT
+        YLEVVT
+
+DLEVVF
+        CLEVVT
+        CLEVVT
+        DCEVVT
+        DCEVVT
+        DDEVVT
+        DDEVVT
+        DEEVVT
+        DEEVVT
+        DFEVVT
+        DFEVVT
+        DGEVVT
+        DGEVVT
+        DHEVVT
+        DHEVVT
+        DIEVVT
+        DIEVVT
+        DKEVVT
+        DKEVVT
+        DMEVVT
+        DMEVVT
+        DNEVVT
+        DNEVVT
+        DPEVVT
+        DPEVVT
+        DQEVVT
+        DQEVVT
+        DREVVT
+        DREVVT
+        DSEVVT
+        DSEVVT
+        DTEVVT
+        DTEVVT
+        DVEVVT
+        DVEVVT
+        DWEVVT
+        DWEVVT
+        DYEVVT
+        DYEVVT
+        ELEVVT
+        ELEVVT
+        FLEVVT
+        FLEVVT
+        GLEVVT
+        GLEVVT
+        HLEVVT
+        HLEVVT
+        LLEVVT
+        LLEVVT
+        MLEVVT
+        MLEVVT
+        PLEVVT
+        PLEVVT
+        QLEVVT
+        QLEVVT
+        RLEVVT
+        RLEVVT
+        TLEVVT
+        TLEVVT
+        VLEVVT
+        VLEVVT
+        WLEVVT
+        WLEVVT
+        YLEVVT
+        YLEVVT
+
+DLEVVG
+        CLEVVT
+        CLEVVT
+        DCEVVT
+        DCEVVT
+        DDEVVT
+        DDEVVT
+        DEEVVT
+        DEEVVT
+        DFEVVT
+        DFEVVT
+        DGEVVT
+        DGEVVT
+        DHEVVT
+        DHEVVT
+        DIEVVT
+        DIEVVT
+        DKEVVT
+        DKEVVT
+        DMEVVT
+        DMEVVT
+        DNEVVT
+        DNEVVT
+        DPEVVT
+        DPEVVT
+        DQEVVT
+        DQEVVT
+        DREVVT
+        DREVVT
+        DSEVVT
+        DSEVVT
+        DTEVVT
+        DTEVVT
+        DVEVVT
+        DVEVVT
+        DWEVVT
+        DWEVVT
+        DYEVVT
+        DYEVVT
+        ELEVVT
+        ELEVVT
+        FLEVVT
+        FLEVVT
+        GLEVVT
+        GLEVVT
+        HLEVVT
+        HLEVVT
+        LLEVVT
+        LLEVVT
+        MLEVVT
+        MLEVVT
+        PLEVVT
+        PLEVVT
+        QLEVVT
+        QLEVVT
+        RLEVVT
+        RLEVVT
+        TLEVVT
+        TLEVVT
+        VLEVVT
+        VLEVVT
+        WLEVVT
+        WLEVVT
+        YLEVVT
+        YLEVVT
+
+DLEVVL
+        CLEVVT
+        CLEVVT
+        DCEVVT
+        DCEVVT
+        DDEVVT
+        DDEVVT
+        DEEVVT
+        DEEVVT
+        DFEVVT
+        DFEVVT
+        DGEVVT
+        DGEVVT
+        DHEVVT
+        DHEVVT
+        DIEVVT
+        DIEVVT
+        DKEVVT
+        DKEVVT
+        DMEVVT
+        DMEVVT
+        DNEVVT
+        DNEVVT
+        DPEVVT
+        DPEVVT
+        DQEVVT
+        DQEVVT
+        DREVVT
+        DREVVT
+        DSEVVT
+        DSEVVT
+        DTEVVT
+        DTEVVT
+        DVEVVT
+        DVEVVT
+        DWEVVT
+        DWEVVT
+        DYEVVT
+        DYEVVT
+        ELEVVT
+        ELEVVT
+        FLEVVT
+        FLEVVT
+        GLEVVT
+        GLEVVT
+        HLEVVT
+        HLEVVT
+        LLEVVT
+        LLEVVT
+        MLEVVT
+        MLEVVT
+        PLEVVT
+        PLEVVT
+        QLEVVT
+        QLEVVT
+        RLEVVT
+        RLEVVT
+        TLEVVT
+        TLEVVT
+        VLEVVT
+        VLEVVT
+        WLEVVT
+        WLEVVT
+        YLEVVT
+        YLEVVT
+
+DLEVVM
+        CLEVVT
+        CLEVVT
+        DCEVVT
+        DCEVVT
+        DDEVVT
+        DDEVVT
+        DEEVVT
+        DEEVVT
+        DFEVVT
+        DFEVVT
+        DGEVVT
+        DGEVVT
+        DHEVVT
+        DHEVVT
+        DIEVVT
+        DIEVVT
+        DKEVVT
+        DKEVVT
+        DMEVVT
+        DMEVVT
+        DNEVVT
+        DNEVVT
+        DPEVVT
+        DPEVVT
+        DQEVVT
+        DQEVVT
+        DREVVT
+        DREVVT
+        DSEVVT
+        DSEVVT
+        DTEVVT
+        DTEVVT
+        DVEVVT
+        DVEVVT
+        DWEVVT
+        DWEVVT
+        DYEVVT
+        DYEVVT
+        ELEVVT
+        ELEVVT
+        FLEVVT
+        FLEVVT
+        GLEVVT
+        GLEVVT
+        HLEVVT
+        HLEVVT
+        LLEVVT
+        LLEVVT
+        MLEVVT
+        MLEVVT
+        PLEVVT
+        PLEVVT
+        QLEVVT
+        QLEVVT
+        RLEVVT
+        RLEVVT
+        TLEVVT
+        TLEVVT
+        VLEVVT
+        VLEVVT
+        WLEVVT
+        WLEVVT
+        YLEVVT
+        YLEVVT
+
+DLEVVN
+        CLEVVT
+        CLEVVT
+        DCEVVT
+        DCEVVT
+        DDEVVT
+        DDEVVT
+        DEEVVT
+        DEEVVT
+        DFEVVT
+        DFEVVT
+        DGEVVT
+        DGEVVT
+        DHEVVT
+        DHEVVT
+        DIEVVT
+        DIEVVT
+        DKEVVT
+        DKEVVT
+        DMEVVT
+        DMEVVT
+        DNEVVT
+        DNEVVT
+        DPEVVT
+        DPEVVT
+        DQEVVT
+        DQEVVT
+        DREVVT
+        DREVVT
+        DSEVVT
+        DSEVVT
+        DTEVVT
+        DTEVVT
+        DVEVVT
+        DVEVVT
+        DWEVVT
+        DWEVVT
+        DYEVVT
+        DYEVVT
+        ELEVVT
+        ELEVVT
+        FLEVVT
+        FLEVVT
+        GLEVVT
+        GLEVVT
+        HLEVVT
+        HLEVVT
+        LLEVVT
+        LLEVVT
+        MLEVVT
+        MLEVVT
+        PLEVVT
+        PLEVVT
+        QLEVVT
+        QLEVVT
+        RLEVVT
+        RLEVVT
+        TLEVVT
+        TLEVVT
+        VLEVVT
+        VLEVVT
+        WLEVVT
+        WLEVVT
+        YLEVVT
+        YLEVVT
+
+DLEVVS
+        CLEVVT
+        CLEVVT
+        DCEVVT
+        DCEVVT
+        DDEVVT
+        DDEVVT
+        DEEVVT
+        DEEVVT
+        DFEVVT
+        DFEVVT
+        DGEVVT
+        DGEVVT
+        DHEVVT
+        DHEVVT
+        DIEVVT
+        DIEVVT
+        DKEVVT
+        DKEVVT
+        DLLVGS
+        DMEVVT
+        DMEVVT
+        DNEVVT
+        DNEVVT
+        DPEVVT
+        DPEVVT
+        DQEVVT
+        DQEVVT
+        DREVVT
+        DREVVT
+        DSEVVT
+        DSEVVT
+        DTEVVT
+        DTEVVT
+        DVEVVT
+        DVEVVT
+        DWEVVT
+        DWEVVT
+        DYEVVT
+        DYEVVT
+        ELEVVT
+        ELEVVT
+        FLEVVT
+        FLEVVT
+        GLEVVT
+        GLEVVT
+        HLEVVT
+        HLEVVT
+        LLEVVT
+        LLEVVT
+        MLEVVT
+        MLEVVT
+        PLEVVT
+        PLEVVT
+        QLEVVT
+        QLEVVT
+        RLEVVT
+        RLEVVT
+        TLEVVT
+        TLEVVT
+        VLEVVT
+        VLEVVT
+        WLEVVT
+        WLEVVT
+        YLEVVT
+        YLEVVT
+
+DLEVVT
+        CLEVVT
+        DCEVVT
+        DDEVVT
+        DEEVVT
+        DFEVVT
+        DGEVVT
+        DHEVVT
+        DIEVVT
+        DKEVVT
+        DLYLVT
+        DMEVVT
+        DNEVVT
+        DPEVVT
+        DQEVVT
+        DREVVT
+        DSEVVT
+        DTEVVT
+        DVEVVT
+        DWEVVT
+        DYEVVT
+        ELEVVT
+        FLEVVT
+        GLEVVT
+        HLEVVT
+        LLEVVT
+        MLEVVT
+        PLEVVT
+        QLEVVT
+        RLEVVT
+        TLEVVT
+        VLEVVT
+        WLEVVT
+        YLEVVT
+
+DLEVVV
+        CLEVVT
+        CLEVVT
+        DCEVVT
+        DCEVVT
+        DDEVVT
+        DDEVVT
+        DEEVVT
+        DEEVVT
+        DFEVVT
+        DFEVVT
+        DGEVVT
+        DGEVVT
+        DHEVVT
+        DHEVVT
+        DIEVVT
+        DIEVVT
+        DKEVVT
+        DKEVVT
+        DMEVVT
+        DMEVVT
+        DNEVVT
+        DNEVVT
+        DPEVVT
+        DPEVVT
+        DQEVVT
+        DQEVVT
+        DREVVT
+        DREVVT
+        DSEVVT
+        DSEVVT
+        DTEVVT
+        DTEVVT
+        DVEVVT
+        DVEVVT
+        DWEVVT
+        DWEVVT
+        DYEVVT
+        DYEVVT
+        ELEVVT
+        ELEVVT
+        FLEVVT
+        FLEVVT
+        GLEVVT
+        GLEVVT
+        HLEVVT
+        HLEVVT
+        LLEVVT
+        LLEVVT
+        MLEVVT
+        MLEVVT
+        PLEVVT
+        PLEVVT
+        QLEVVT
+        QLEVVT
+        RLEVVT
+        RLEVVT
+        TLEVVT
+        TLEVVT
+        VLEVVT
+        VLEVVT
+        WLEVVT
+        WLEVVT
+        YLEVVT
+        YLEVVT
+
+DNVVCC
+        DLVVIC
+
+DRMEEC
+        DPMEEC
+
+DSVICC
+        DSVIDC
+        DSVIDC
+
+DSVVCC
+        DLVVIC
+        DSVIDC
+
+DTATPC
+        ATATPP
+        ATATPP
+
+DWTTPC
+        ACTTPC
+        CCTTPC
+        DPTTPL
+        DPTTPL
+        EATTPC
+        EGTTPC
+        EPTTPC
+        FCTTPC
+        GCTTPC
+        HCTTPC
+        KCTTPC
+        LCTTPC
+        NCTTPC
+        PCTTPC
+        RCTTPC
+        TCTTPC
+
+DYMEEC
+        DPMEEC
+
+DYPVPC
+        DREVPC
+
+EAVVCC
+        EAEVPC
+
+ECTTPC
+        ACTTPC
+        CCTTPC
+        EATTPC
+        ECEVPC
+        EGTTPC
+        EPTTPC
+        FCTTPC
+        GCTTPC
+        HCTTPC
+        KCTTPC
+        LCTTPC
+        NCTTPC
+        PCTTPC
+        RCTTPC
+        TCTTPC
+
+ECTTPN
+        ACTTPC
+        ACTTPC
+        CCTTPC
+        CCTTPC
+        EATTPC
+        EATTPC
+        EGTTPC
+        EGTTPC
+        EPTTPC
+        EPTTPC
+        FCTTPC
+        FCTTPC
+        GCTTPC
+        GCTTPC
+        HCTTPC
+        HCTTPC
+        KCTTPC
+        KCTTPC
+        LCTTPC
+        LCTTPC
+        NCTTPC
+        NCTTPC
+        PCTTPC
+        PCTTPC
+        RCTTPC
+        RCTTPC
+        TCTTPC
+        TCTTPC
+
+ECVVCC
+        ECEVPC
+
+EDAVCC
+        EDEVPC
+
+EDIVCC
+        EDEVPC
+
+EDVVAC
+        EDEVPC
+
+EDVVAT
+        EDVTST
+        EVVTAT
+        EVVVST
+
+EDVVCC
+        EDEVPC
+
+EEMEEC
+        DPMEEC
+
+EHVVCC
+        EHEVPC
+
+EKVVCC
+        EKEVPC
+
+ELVVCC
+        DLVVIC
+        ELEVPC
+
+ENVVCC
+        ENEVPC
+
+ESTTPC
+        ACTTPC
+        CCTTPC
+        EATTPC
+        EGTTPC
+        EPTTPC
+        ESEVPC
+        FCTTPC
+        GCTTPC
+        HCTTPC
+        KCTTPC
+        LCTTPC
+        NCTTPC
+        PCTTPC
+        RCTTPC
+        TCTTPC
+
+ESVVCC
+        ESEVPC
+
+ETVVCC
+        ETEVPC
+
+EVVVCC
+        EVVTSC
+        EVVVST
+        EVVVST
+        EVVVST
+
+EWVVCC
+        EWEVPC
+
+EYVVCC
+        EYVVLL
+        EYVVLL
+        EYVVLL
+
+GCPIPC
+        GCPLPP
+        GCPLPP
+        GCTTPC
+
+GSEVCC
+        ESEVPC
+        GREVPC
+
+IEMEEC
+        DPMEEC
+
+KEMEEC
+        DPMEEC
+
+NCIAPC
+        NCTTPC
+
+NCSTPC
+        ACTTPC
+        CCTTPC
+        FCTTPC
+        GCTTPC
+        HCTTPC
+        KCTTPC
+        LCTTPC
+        NCTTPC
+        PCTTPC
+        RCTTPC
+        TCTTPC
+
+NEMEEC
+        DPMEEC
+
+NPEVVT
+        CLEVVT
+        DCEVVT
+        DDEVVT
+        DEEVVT
+        DFEVVT
+        DGEVVT
+        DHEVVT
+        DIEVVT
+        DKEVVT
+        DMEVVT
+        DNEVVT
+        DPEVVT
+        DQEVVT
+        DREVVT
+        DSEVVT
+        DTEVVT
+        DVEVVT
+        DWEVVT
+        DYEVVT
+        ELEVVT
+        FLEVVT
+        GLEVVT
+        HLEVVT
+        LLEVVT
+        MLEVVT
+        PLEVVT
+        QLEVVT
+        RLEVVT
+        TLEVVT
+        VLEVVT
+        WLEVVT
+        YLEVVT
+
+PEMEEC
+        DPMEEC
+
+PSSTPC
+        PCTTPC
+
+TEMEEC
+        DPMEEC
+
+WEMEEC
+        DPMEEC
