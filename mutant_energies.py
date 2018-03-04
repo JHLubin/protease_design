@@ -54,11 +54,13 @@ class mutation_collection:
 		self.sf = get_fa_scorefxn()
 
 		# Identifying mutations and their frequency and energies
-		other_class_values = ['mutations', 'mut_freq', 'mut_location', 
-			'mut_res_es', 'mut_int_es']
+		other_class_values = ['mutations', 'mut_freq', 'mutation_pdb', 
+			'mut_location', 'mut_res_es', 'mut_int_es', 
+			'interaction_residues']
 		for i in other_class_values:
 			setattr(self, i, [])
 
+		# Iterating through all decoys extracting relevant info
 		for i in range(self.decoy_count):
 			print '\tanalyzing decoy', i
 			self.ident_mutations(self.relaxed_pdbs[i], self.designed_pdbs[i])
@@ -263,13 +265,13 @@ class mutation_collection:
 		# Getting sum residue interaction energy with contact residues
 		# and residue contact list
 		int_e_sum = 0
-		contacts = []
+		contacts = {}
 		for n, p in enumerate(partner):
 			res_start_int_e = self.res_interact_energy(before, res, p)
 			res_end_int_e = self.res_interact_energy(after, res, p)
 			res_delta_int_e = res_end_int_e - res_start_int_e
 			int_e_sum += res_delta_int_e
-			contacts.append(partner[n])
+			contacts[partner[n]] = res_end_int_e
 
 		return mut_loc, int_e_sum, contacts
 
@@ -305,7 +307,7 @@ class mutation_collection:
 				res_delta_e = design_res_energy - relax_res_energy
 
 				# Getting pairwise residue energy change
-				mut_loc, res_delta_int_e = \
+				mut_loc, res_delta_int_e, interact_res = \
 					self.residue_pairwise_energy(i, relax_pose, design_pose)
 
 				# Aggregating results
@@ -314,15 +316,19 @@ class mutation_collection:
 					mut_ind = self.mutations.index(mut_string)
 					assert self.mut_location[mut_ind] == mut_loc
 					self.mut_freq[mut_ind] += 1
+					self.mutation_pdb[mut_ind].append(des_pdb)
 					self.mut_res_es[mut_ind].append(res_delta_e)
 					self.mut_int_es[mut_ind].append(res_delta_int_e)
+					self.interaction_residues[mut_ind].append(interact_res)
 				else:
 					# New mutation or first decoy
 					self.mutations.append(mut_string)
 					self.mut_location.append(mut_loc)
 					self.mut_freq.append(1)
+					self.mutation_pdb.append([des_pdb])
 					self.mut_res_es.append([res_delta_e])
 					self.mut_int_es.append([res_delta_int_e])
+					self.interaction_residues.append([interact_res])
 
 
 def isolate_sequence_from_fasc(fasc_name):
@@ -354,7 +360,7 @@ def mutations_by_seq_report(name, mc, head=False):
 	# Writing body
 	report_lines = []
 	for i in range(len(mc.mutations)):
-		line = [str(j) for j in [mc.cleaved, mc.sequence, 
+		line = [str(j) for j in [mc.cleaved, mc.short_sequence, 
 				mc.mut_location[i], mc.mutations[i], mc.mut_rate[i], 
 				round(mc.mut_res_min_e[i], 3), 
 				round(mc.mut_int_min_e[i], 3)]]
@@ -375,9 +381,10 @@ class mutations_aggregate:
 		self.mc_set = mc_set
 		self.design_peptide = self.mc_set[0].design_peptide
 
-		# Get full list of mutable residues (differs within the set)
+		# Get full list of mutable residues (differs within the set), pep res
 		self.residues_list = self.get_full_residue_list()
 		self.mutable_count = len(self.residues_list)
+		self.pep_res = self.get_pep_res()
 
 		# Initializing data bins
 		self.total_potential_models = 0
@@ -403,6 +410,9 @@ class mutations_aggregate:
 		self.pre_report = self.mc_tabulation()
 		self.report = self.cleanup_report_table()
 
+		# Creating residue pairing representative decoys dict list
+		self.representative_deocys = self.pick_representative_deocys()
+
 	def get_full_residue_list(self):
 		""" 
 		Reads through a set of mutation_collection objects and collects a full
@@ -416,6 +426,22 @@ class mutations_aggregate:
 
 		complete_residues_list.sort()
 		return complete_residues_list
+
+	def get_pep_res(self):
+		""" 
+		Checks through the set of mutation_collection objects, verifies that
+		all have the same peptide residues identified, returns the set if so.
+		"""
+		pep_res = None
+
+		for mc in self.mc_set:
+			pep_list = mc.pep_res
+			if pep_res == None: # Initial case
+				pep_res = pep_list
+			else:
+				assert pep_res == pep_list
+
+		return pep_res
 
 	def get_initial_residues(self):
 		""" Collect starting residues, before mutation. Sloppy hard-coded. """
@@ -615,6 +641,7 @@ class mutations_aggregate:
 		m_ind = mutation_collection.mutations.index(mutation)
 
 		mc_extract = []
+		mc_extract.append(mutation_collection.cleaved[0].upper())
 		mc_extract.append(mutation_collection.short_sequence)
 		t = '\'' + mutation_collection.peptide_res_types + '\''
 		mc_extract.append(t)
@@ -715,7 +742,7 @@ class mutations_aggregate:
 				# Converting from list to lines
 				for mutation in line[-1]:
 					# Sorting
-					mutation[-1] = sorted(mutation[-1], key=iget(2))
+					mutation[-1] = sorted(mutation[-1], key=iget(0, 2))
 
 					# Converting from list to lines
 					for s in mutation[-1]:
@@ -732,6 +759,73 @@ class mutations_aggregate:
 
 		return cleaned_table
 
+	def favorable_interactions_by_pair_energy(self):
+		"""
+		Looks at the list of pairwise residue interactions across all 
+		mutation_collection objects in the set, and collects a dict of decoys
+		with protease mutations interacting with each peptide residue with an
+		energy better than -0.5 KCal/mol. 
+		"""
+		interaction_sets = [{} for i in self.pep_res]
+
+		for x, pep in enumerate(self.pep_res):
+			for mc in self.mc_set:
+				for y, mut in enumerate(mc.mutations):
+					for z, en in enumerate(mc.interaction_residues[y]):
+						e_round = round(en[pep],3)
+						if e_round < -0.5:
+							decoy_energy = [mc.short_sequence, e_round, 
+											mc.mutation_pdb[y][z]]
+							if mut in interaction_sets[x]:
+								interaction_sets[x][mut].append(decoy_energy)
+							else:
+								interaction_sets[x][mut] = [decoy_energy]
+
+		for i, res in enumerate(interaction_sets):
+			for v in res.values():
+				v.sort(key=lambda x: (x[0][i], x[1]))
+
+		return interaction_sets
+
+	def pick_representative_deocys(self):
+		"""
+		Using favorable_interactions_by_pair_energy to create a starting list
+		of protease mutations that yield favorable interactions with each 
+		peptide residue, this function rearranges that list to organize the 
+		decoys with favorable interactions by both peptide residue position, 
+		and by what amino acid the peptide has in that position. It then trims
+		the list of decoys representing each type of interaction to the three 
+		with the most favorable interaction energy.
+		"""
+		interaction_sets = self.favorable_interactions_by_pair_energy()
+
+		# Rearranging the interaction_sets
+		rearranged_int_set = [{} for i in self.pep_res]
+		for n, res in enumerate(interaction_sets):
+			for k, v in res.items():
+				for decoy in v:	
+					aa = decoy[0][n]
+					if aa not in rearranged_int_set[n]: 
+					# First instance of this amino acid in this peptide space
+						rearranged_int_set[n][aa]={k:[decoy[1:]]}
+					else:
+						if k not in rearranged_int_set[n][aa]:
+						# First pairing of this mutation with this AA 
+							rearranged_int_set[n][aa][k] = [decoy[1:]]
+						else:
+						# appending to existing mutation/aa pair
+							rearranged_int_set[n][aa][k].append(decoy[1:])
+
+		# Sorting the rearranged list
+		for i in rearranged_int_set:
+			for val in i.values():
+				for v in val.values():
+					v.sort(key=lambda x: x[0])
+					while len(v) > 3: # Paring down to best three decoys
+						v.pop(-1)
+
+		return rearranged_int_set
+
 
 def aggregated_report(name, mc_set):
 	"""
@@ -745,8 +839,8 @@ def aggregated_report(name, mc_set):
 	line_length = ma.output_length
 	template = '{:12s}' * line_length + '\n'
 	header = ['location', 'interacts', 'start_AA', 'start_type', 'mut_prob', 
-				'final_AA', 'end_type', 'rel_prob', 'pep_seq', 'seq_class', 
-				'res_energy', 'int_energy', 'mut_prob_by_seq']
+				'final_AA', 'end_type', 'rel_prob', 'cleaved', 'pep_seq',  
+				'seq_class', 'res_energy', 'int_energy', 'mut_prob_by_seq']
 
 	with open(name, 'w') as r:
 		r.write(template.format(*header))
@@ -757,6 +851,39 @@ def aggregated_report(name, mc_set):
 			r.write(template.format(*line))
 
 	print name
+	return ma
+
+
+def representative_decoys_report(name, aggregate):
+	"""
+	Writes a file using the list of dictionaries generated by the 
+	pick_representative_deocys in the mutations_aggregate object,
+	tabulating the peptide position, the residue in that position, the 
+	mutation producing a favorable interaction with that position, the best 
+	energy from that interaction, and a command for PyMOL to load the 
+	appropriate set of PDB's exhibiting the interaction.
+	"""
+	position_ref = {0:'p6', 1:'p5', 2:'p4', 3:'p3', 4:'p2', 5:'p1'}
+
+	rep_set = aggregate.representative_deocys
+	header = ['Locus', 'Res', 'Mutant', 'Min_E', 'Decoys']
+	template = '{:12s}' * 4 + '{}\n'
+
+	with open(name, 'w') as r:
+		r.write(template.format(*header))
+
+		for n, i in enumerate(rep_set):
+			locus = position_ref[n]
+			for aa, v in i.items():
+				for mut, decs in v.items():
+					min_e = decs[0][0] # decoys are sorted, energy is first
+					decoys = [x[1] for x in decs]
+					cmd = 'for pdb in ' + str(decoys) + ': cmd.load(pdb)'
+					out_line = [locus, aa, mut, str(min_e), cmd]
+					r.write(template.format(*out_line))
+
+	print name
+
 
 ##############################################################################
 def main():
@@ -766,21 +893,21 @@ def main():
 
 	# Intitialize Rosetta
 	ros_opts = '-mute all'
-	init(ros_opts)	
+	init(ros_opts)
 
-	# Making mutation_collection objects for each sequence
-	report_files = sorted(glob(join(folder, '*.fasc')))
-	for n, i in enumerate(report_files):
-		if 'combined_reports.fasc' in i: # Skip file made by condense_fasc
-			report_files.pop(n)
-
-	peptide_sequences = [isolate_sequence_from_fasc(i) for i in report_files]
-	
 	# Checking if analysis has already been run and pickled
 	pickle_name = join(folder, folder.rstrip('/') + '_mutations.pkl')
 
-	if args.force_evaluate or not isfile(pickle_name):
+	if args.force_evaluate or not isfile(pickle_name):	
+		# Making mutation_collection objects for each sequence
+		report_files = sorted(glob(join(folder, '*.fasc')))
+		for n, i in enumerate(report_files):
+			if 'combined_reports.fasc' in i: # Skip file made by condense_fasc
+				report_files.pop(n)
+
 		# Simultaneously analyzing and writing to by-sequence report
+		peptide_sequences = \
+			[isolate_sequence_from_fasc(i) for i in report_files]
 		seq_mutants = []
 		report_name = join(folder, folder.rstrip('/') + '_mutation_summary.txt')
 		for n, i in enumerate(peptide_sequences):
@@ -805,8 +932,11 @@ def main():
 
 	# Making cross-sequence aggregated report
 	agg_name = join(folder, folder.rstrip('/') + '_by_mutations.txt')
-	aggregated_report(agg_name, seq_mutants)
+	mutations_aggregate = aggregated_report(agg_name, seq_mutants)
 
+	# Making list of representative decoys
+	d_list_name = join(folder, folder.rstrip('/') + '_look_at_me.txt')
+	representative_decoys_report(d_list_name, mutations_aggregate)
 
 if __name__ == '__main__':
 	main()

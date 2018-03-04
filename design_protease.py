@@ -22,6 +22,7 @@ from pyrosetta.rosetta.protocols.enzdes import ADD_NEW, AddOrRemoveMatchCsts
 from pyrosetta.rosetta.protocols.flexpep_docking import FlexPepDockingProtocol
 from pyrosetta.rosetta.protocols.relax import FastRelax
 from pyrosetta.teaching import MinMover, PackRotamersMover, SimpleThreadingMover
+from sys import exit
 
 def parse_args():
 	info = "Design a protease around a peptide sequence"
@@ -85,9 +86,9 @@ def get_seq_list(seq_arg):
 			# Sequence was typed directly into the argument
 			pep_sequences.append(inp.strip())
 
-		for s in pep_sequences:
+		for n, s in enumerate(pep_sequences):
 			if len(s) == 6: # Hard code for HCV
-				s = 'A' + s + 'SMHL'
+				pep_sequences[n] = 'A' + s + 'SMHL'
 			else:
 				assert len(s) == 11
 
