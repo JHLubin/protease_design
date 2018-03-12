@@ -878,7 +878,7 @@ def representative_decoys_report(name, aggregate):
 				for mut, decs in v.items():
 					min_e = decs[0][0] # decoys are sorted, energy is first
 					decoys = [x[1] for x in decs]
-					cmd = 'for pdb in ' + str(decoys) + ': cmd.load(pdb)'
+					cmd = '="for pdb in ' + str(decoys) + ': cmd.load(pdb)"'
 					out_line = [locus, aa, mut, str(min_e), cmd]
 					r.write(template.format(*out_line))
 
