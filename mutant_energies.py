@@ -162,59 +162,6 @@ class mutation_collection:
 		mut_string = '_'.join([str(res), start_res_name, end_res_name])
 
 		return start_res_name, end_res_name, mut_string
-		
-	#def interact_energy(self, pose, res, interaction_set):
-		#""" 
-		#Takes a given pose, residue, and set of interaction residues to check 
-		#against, and sums the weighted residue-pair interaction energies 
-		#between the input residue and each member of the interaction set.
-		#ref_wts from design_protease.
-		#"""
-		## Collecting interaction energies
-		#sum_int_energy = 0
-		#r1 = pose.residue(res)
-		#print res
-		#for i in interaction_set:
-		#	r2 = pose.residue(i)
-		#
-		#	# Getting emap
-		#	emap = EMapVector()
-		#	self.sf.eval_ci_2b(r1, r2, pose, emap) # Includes many zero terms
-		#
-		#	# Cleaning up emap
-		#	org_emp = {}
-		#	emap_nz = str(emap.show_nonzero()).split()
-		#	for j in range(len(emap_nz)/2): # Converting to a dict
-		#		org_emp[emap_nz[2 * j].rstrip(':')] = float(emap_nz[2 * j + 1])
-		#
-		#	# Adding weighted scores
-		#	for j in org_emp:
-		#		if j in ref_wts: # Emap contains terms with 0 weight in REF
-		#			sum_int_energy += org_emp[j] * ref_wts[j]
-		#
-		#return sum_int_energy
-
-	#def residue_pairwise_energy(self, res, before, after):
-		#""" 
-		#Theis function determines whether a mutation is on the protease or  
-		#peptide, and conversely the relevant set of residues contributing to 
-		#the mutated residue's score. Then it runs interact_energy accordingly
-		#on the residue in the relaxed and designed poses, and calculates the
-		#difference.
-		#"""
-		#if res in self.pep_res:
-		#	mut_loc = 'Peptide'
-		#	partner = self.des_res
-		#else:
-		#	mut_loc = 'Protease'
-		#	partner = self.pep_res
-		#
-		## Getting sum residue interaction energy with contact residues
-		#res_start_int_e = self.interact_energy(before, res, partner)
-		#res_end_int_e = self.interact_energy(after, res, partner)
-		#res_delta_int_e = res_end_int_e - res_start_int_e
-		#
-		#return mut_loc, res_delta_int_e
 
 	def res_interact_energy(self, pose, res1, res2):
 		""" 
@@ -271,7 +218,7 @@ class mutation_collection:
 			res_end_int_e = self.res_interact_energy(after, res, p)
 			res_delta_int_e = res_end_int_e - res_start_int_e
 			int_e_sum += res_delta_int_e
-			contacts[partner[n]] = res_end_int_e
+			contacts[p] = [res_start_int_e, res_end_int_e]
 
 		return mut_loc, int_e_sum, contacts
 
@@ -772,9 +719,10 @@ class mutations_aggregate:
 			for mc in self.mc_set:
 				for y, mut in enumerate(mc.mutations):
 					for z, en in enumerate(mc.interaction_residues[y]):
-						e_round = round(en[pep],3)
-						if e_round < -0.5:
-							decoy_energy = [mc.short_sequence, e_round, 
+						e_start_round = round(en[pep][0],3)
+						e_end_round = round(en[pep][1],3)
+						if e_end_round < -0.5:
+							decoy_energy = [mc.short_sequence, e_end_round, 
 											mc.mutation_pdb[y][z]]
 							if mut in interaction_sets[x]:
 								interaction_sets[x][mut].append(decoy_energy)
@@ -860,8 +808,11 @@ def representative_decoys_report(name, aggregate):
 	pick_representative_deocys in the mutations_aggregate object,
 	tabulating the peptide position, the residue in that position, the 
 	mutation producing a favorable interaction with that position, the best 
-	energy from that interaction, and a command for PyMOL to load the 
-	appropriate set of PDB's exhibiting the interaction.
+	energy from that interaction, and a command for PyMOL. The command will 
+	delete everything currently in the viewer, then load the appropriate set 
+	of PDB's exhibiting the interaction, run the compare_protease script, and
+	zoom to the mutated residue in the protease. The command will be within a
+	="" so that Excel won't split it up into multiple columns.
 	"""
 	position_ref = {0:'p6', 1:'p5', 2:'p4', 3:'p3', 4:'p2', 5:'p1'}
 
@@ -869,18 +820,25 @@ def representative_decoys_report(name, aggregate):
 	header = ['Locus', 'Res', 'Mutant', 'Min_E', 'Decoys']
 	template = '{:12s}' * 4 + '{}\n'
 
+	lines = []
+	for n, i in enumerate(rep_set):
+		locus = position_ref[n]
+		for aa, v in i.items():
+			for mut, decs in v.items():
+				min_e = decs[0][0] # decoys are sorted, energy is first
+				decoys = [x[1] for x in decs]
+				res = str(mut.split()[0]) # Mutated residue on protease
+				cmd = '="delete all; for pdb in ' + str(decoys) 
+				cmd += ': cmd.load(pdb); @compare_protease.pml; '
+				cmd += 'zoom res ' + res + '"' # Jump to relevant residue
+				out_line = [locus, aa, mut, str(min_e), cmd]
+				lines.append(template.format(*out_line))
+
+	lines.sort(key=lambda x: (x[0], x[2], x[1]))
+
 	with open(name, 'w') as r:
 		r.write(template.format(*header))
-
-		for n, i in enumerate(rep_set):
-			locus = position_ref[n]
-			for aa, v in i.items():
-				for mut, decs in v.items():
-					min_e = decs[0][0] # decoys are sorted, energy is first
-					decoys = [x[1] for x in decs]
-					cmd = '="for pdb in ' + str(decoys) + ': cmd.load(pdb)"'
-					out_line = [locus, aa, mut, str(min_e), cmd]
-					r.write(template.format(*out_line))
+		r.writelines(lines)
 
 	print name
 
