@@ -811,8 +811,7 @@ def representative_decoys_report(name, aggregate):
 	energy from that interaction, and a command for PyMOL. The command will 
 	delete everything currently in the viewer, then load the appropriate set 
 	of PDB's exhibiting the interaction, run the compare_protease script, and
-	zoom to the mutated residue in the protease. The command will be within a
-	="" so that Excel won't split it up into multiple columns.
+	zoom to the mutated residue in the protease. 
 	"""
 	position_ref = {0:'p6', 1:'p5', 2:'p4', 3:'p3', 4:'p2', 5:'p1'}
 
@@ -827,10 +826,11 @@ def representative_decoys_report(name, aggregate):
 			for mut, decs in v.items():
 				min_e = decs[0][0] # decoys are sorted, energy is first
 				decoys = [x[1] for x in decs]
-				res = str(mut.split()[0]) # Mutated residue on protease
-				cmd = '="delete all; for pdb in ' + str(decoys) 
+				decoys += [x[1].replace('designed', 'relaxed') for x in decs]
+				res = str(mut.split('_')[0]) # Mutated residue on protease
+				cmd = 'delete all; for pdb in ' + str(decoys) 
 				cmd += ': cmd.load(pdb); @compare_protease.pml; '
-				cmd += 'zoom res ' + res + '"' # Jump to relevant residue
+				cmd += 'zoom res ' + res # Jump to relevant residue
 				out_line = [locus, aa, mut, str(min_e), cmd]
 				lines.append(template.format(*out_line))
 
