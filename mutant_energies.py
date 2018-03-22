@@ -721,13 +721,14 @@ class mutations_aggregate:
 					for z, en in enumerate(mc.interaction_residues[y]):
 						e_start_round = round(en[pep][0],3)
 						e_end_round = round(en[pep][1],3)
-						if e_end_round < -0.5:
-							decoy_energy = [mc.short_sequence, e_end_round, 
-											mc.mutation_pdb[y][z]]
-							if mut in interaction_sets[x]:
-								interaction_sets[x][mut].append(decoy_energy)
-							else:
-								interaction_sets[x][mut] = [decoy_energy]
+						e_dif = e_end_round - e_start_round
+						#if e_end_round < -0.5:
+						decoy_energy = [mc.short_sequence, e_end_round, 
+										e_dif, mc.mutation_pdb[y][z]]
+						if mut in interaction_sets[x]:
+							interaction_sets[x][mut].append(decoy_energy)
+						else:
+							interaction_sets[x][mut] = [decoy_energy]
 
 		for i, res in enumerate(interaction_sets):
 			for v in res.values():
@@ -816,8 +817,8 @@ def representative_decoys_report(name, aggregate):
 	position_ref = {0:'p6', 1:'p5', 2:'p4', 3:'p3', 4:'p2', 5:'p1'}
 
 	rep_set = aggregate.representative_deocys
-	header = ['Locus', 'Res', 'Mutant', 'Min_E', 'Decoys']
-	template = '{:12s}' * 4 + '{}\n'
+	header = ['Locus', 'Res', 'Mutant', 'Min_E', 'E_Change', 'Decoys']
+	template = '{:12s}' * 5 + '{}\n'
 
 	lines = []
 	for n, i in enumerate(rep_set):
@@ -825,20 +826,22 @@ def representative_decoys_report(name, aggregate):
 		for aa, v in i.items():
 			for mut, decs in v.items():
 				min_e = decs[0][0] # decoys are sorted, energy is first
-				decoys = [x[1] for x in decs]
-				decoys += [x[1].replace('designed', 'relaxed') for x in decs]
+				e_change = decs[0][1] # decoys are sorted, energy is first
+				decoys = [x[2] for x in decs]
+				decoys += [x[2].replace('designed', 'relaxed') for x in decs]
 				res = str(mut.split('_')[0]) # Mutated residue on protease
 				cmd = 'delete all; for pdb in ' + str(decoys) 
 				cmd += ': cmd.load(pdb); @compare_protease.pml; '
 				cmd += 'zoom res ' + res # Jump to relevant residue
-				out_line = [locus, aa, mut, str(min_e), cmd]
-				lines.append(template.format(*out_line))
+				out_line = [locus, aa, mut, str(min_e), str(e_change), cmd]
+				lines.append(out_line)
 
 	lines.sort(key=lambda x: (x[0], x[2], x[1]))
 
 	with open(name, 'w') as r:
 		r.write(template.format(*header))
-		r.writelines(lines)
+		for line in lines:
+			r.write(template.format(*line))
 
 	print name
 

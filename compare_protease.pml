@@ -22,3 +22,4 @@ hide lines, name C+N+O
 set line_width, 3
 hide everything, elem H
 set seq_view, 1
+deselect

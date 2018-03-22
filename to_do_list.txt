@@ -11,6 +11,10 @@ To Do
 		Add cleaved/uncleaved indicator to sequences in by-mutation output
 		Insert blank lines between sets in by-set mutations and condense_fasc
 
+	For curating loops set, use code from Dali for alignment
+	Check at each step--look at PDB files to make sure what's being selected makes sense.
+	Test Manasi's sequences in pipeline, check for recognition.
+
 New protocol
 	Loop hashing, starting with fixed ends
 	Need database of protease loops
