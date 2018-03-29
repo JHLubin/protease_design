@@ -354,6 +354,7 @@ class mutations_aggregate:
 		self.residue_interactions = self.get_residue_interactions()
 
 		# Creating report file
+		self.output_length = 0
 		self.pre_report = self.mc_tabulation()
 		self.report = self.cleanup_report_table()
 
@@ -851,13 +852,14 @@ def main():
 	# Getting user inputs
 	args = parse_args()
 	folder = args.folder
+	base_name = basename(folder.rstrip('/'))
 
 	# Intitialize Rosetta
 	ros_opts = '-mute all'
 	init(ros_opts)
 
 	# Checking if analysis has already been run and pickled
-	pickle_name = join(folder, folder.rstrip('/') + '_mutations.pkl')
+	pickle_name = join(folder, base_name + '_mutations.pkl')
 
 	if args.force_evaluate or not isfile(pickle_name):	
 		# Making mutation_collection objects for each sequence
@@ -870,7 +872,7 @@ def main():
 		peptide_sequences = \
 			[isolate_sequence_from_fasc(i) for i in report_files]
 		seq_mutants = []
-		report_name = join(folder, folder.rstrip('/') + '_mutation_summary.txt')
+		report_name = join(folder, base_name + '_mutation_summary.txt')
 		for n, i in enumerate(peptide_sequences):
 			seq_muts = mutation_collection(folder, i, args.design_peptide)
 			seq_mutants.append(seq_muts)
@@ -892,11 +894,11 @@ def main():
 			seq_mutants = pickle.load(i)
 
 	# Making cross-sequence aggregated report
-	agg_name = join(folder, folder.rstrip('/') + '_by_mutations.txt')
+	agg_name = join(folder, base_name + '_by_mutations.txt')
 	mutations_aggregate = aggregated_report(agg_name, seq_mutants)
 
 	# Making list of representative decoys
-	d_list_name = join(folder, folder.rstrip('/') + '_look_at_me.txt')
+	d_list_name = join(folder, base_name + '_look_at_me.txt')
 	representative_decoys_report(d_list_name, mutations_aggregate)
 
 if __name__ == '__main__':

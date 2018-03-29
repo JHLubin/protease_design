@@ -25,11 +25,16 @@ def cleanup_mutations_section(report_lines, start_point):
 	res_columns = range(start_point, max_len, 4)
 
 	for c in res_columns:
-		first_des_res = min([int(line[c]) for line in report_lines])
+		mutated_residues = [int(line[c]) for line in report_lines if line[c] != "NONE"]
+		if len(mutated_residues) == 0:
+			return
+		first_des_res = min(mutated_residues)
 		for line in report_lines:
 			if int(line[c]) != first_des_res:
 				for i in range(4):
 					line.insert(c, '=""')
+
+	return
 
 
 def main():
@@ -38,6 +43,7 @@ def main():
 
 	# Getting fasc files
 	folder = args.directory
+	base_name = basename(folder.rstrip('/'))
 	folder_search = join(folder, "*.fasc")
 	fasc_files = glob(folder_search)
 	fasc_files.sort()
@@ -57,9 +63,9 @@ def main():
 			f_lines.pop(0) # First line is not useful
 			lines_data = []
 			for i in f_lines:
-				start_mutations = i.find('mutations')
-				scores_section = i[:start_mutations].split()
-				prot_mutations_section = i[start_mutations:].split()
+				start_mutations = i.find(' mutations:')
+				scores_section = i[:start_mutations + 1].split()
+				prot_mutations_section = i[start_mutations + 1:].split()
 				line_data = scores_section[1::2] + prot_mutations_section
 				if i == f_lines[0] and f == fasc_files[0]:
 					headline = scores_section[::2]
@@ -69,8 +75,7 @@ def main():
 			report_lines += lines_data
 
 	# Making combined report
-	report_name = folder.rstrip('/') + '_combined_reports.fasc'
-	report_name = join(folder, report_name)
+	report_name = join(folder, base_name + '_combined_reports.fasc')
 
 	with open(report_name, 'w') as r:
 		# Making template and header
