@@ -65,7 +65,7 @@ def main():
 					headline = scores_section[::2]
 					mut_section_ind = len(scores_section) / 2 + 1
 				lines_data.append(line_data)
-			lines_data.sort(key=lambda x: x[1]) # Sorting by total score
+			lines_data.sort(key=lambda x: x[1], reverse=True) # Sorting by total score
 			report_lines += lines_data
 
 	# Making combined report

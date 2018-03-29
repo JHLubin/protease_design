@@ -15,7 +15,8 @@ from pyrosetta.rosetta.core.select.residue_selector import \
 	NotResidueSelector, OrResidueSelector, ResidueIndexSelector
 from pyrosetta.rosetta.core.pack.task import parse_resfile, TaskFactory
 from pyrosetta.rosetta.core.pack.task.operation import \
-	OperateOnResidueSubset, PreventRepackingRLT, RestrictToRepackingRLT
+	OperateOnResidueSubset, PreventRepackingRLT, \
+	RestrictAbsentCanonicalAASRLT, RestrictToRepackingRLT
 from pyrosetta.rosetta.numeric import xyzVector_double_t
 from pyrosetta.rosetta.protocols.denovo_design.movers import FastDesign
 from pyrosetta.rosetta.protocols.enzdes import ADD_NEW, AddOrRemoveMatchCsts
@@ -51,6 +52,10 @@ def parse_args():
 	parser.add_argument("-m", "--method", type=str, default='fastdesign', 
 		choices=['fastdesign', 'custom'],
 		help="What design protocol do you want to use?")
+	parser.add_argument("-trmf", "--target_res_mutation_file", type=str, 
+		default=None, help="File of format: 'res_number    design_options' \
+		to specify further design restrictions. Useful when picking between \
+		identified favorable mutations.")
 	args = parser.parse_args()
 	return args
 
@@ -60,6 +65,15 @@ def init_opts(cst_file='ly104.cst'):
 	ros_opts = '-mute all -enzdes::cstfile ' + cst_file
 	ros_opts += ' -cst_fa_weight 1.0 -run:preserve_header -out:pdb_gz'
 	return ros_opts
+
+
+def readfile(file_name):
+	""" Opens a file in read-mode and returns a list of the text lines """
+	with open(file_name, 'r') as r:
+		lines = r.readlines()
+
+	return lines
+
 
 ######### Threading and getting sequences ####################################
 def get_seq_list(seq_arg):
@@ -72,8 +86,7 @@ def get_seq_list(seq_arg):
 	for inp in seq_arg:
 		if '.' in inp:
 			# If input is a file
-			with open(inp, 'r') as t:
-				lis = t.readlines()
+			lis = readfile(inp) 
 			if len(lis) == 1:
 				# If all sequences are listed horizontally on one line
 				# rather than one per line, rearrange
@@ -121,6 +134,7 @@ def quick_thread(destination, pose, sequences, cleaved=False, make=False):
 			threaded_pose.dump_pdb(out_name)
 
 	return thread_files
+
 
 ######### Residue selection ##################################################
 def mutable_residues_selector(design_peptide=False, single_pep_res=None):
@@ -263,6 +277,18 @@ def select_residues(design_peptide=False):
 
 	return residue_selectors
 
+
+def selector_to_list(pose, selector):
+	""" Converts a selector output vector to a list of selected residues """
+	selection_vector = selector.apply(pose)
+	selection_list = []
+	for i in range(len(selection_vector)): 
+		if selection_vector[i+1]==1:
+			selection_list.append(i+1)
+
+	return selection_list 
+
+
 ######### Design #############################################################
 def apply_constraints(pose):
 	""" Applies the constraints form the input CST file to a pose """
@@ -305,23 +331,59 @@ def make_move_map(pose, peptide_residues, repackable_residues):
 	return mm
 
 
-def make_task_factory(residue_selectors):
+def make_task_factory(residue_selectors, confine_design=None):
 	""" 
 	Makes a TaskFactory with operations that leave the mutable residues 
 	designable, restricts the nearby residues to repacking, and prevents 
 	repacking of other residues.
+
+	Also includes the ability to take in a target residue mutatations text 
+	file in the form:
+	res_number 		allowed_AAs
+	for example:
+	138 			KR
+
+	All designable residues not listed in the file are restricted to repacking
+	and the listed residues are limited in their design options to those AAs 
+	listed.
 	"""
 	design_set = residue_selectors['mutable']
 	repack_set = residue_selectors['packable']
 	other_set = residue_selectors['other']
 
 	prevent = PreventRepackingRLT() # No repack, no design
-	restrict = RestrictToRepackingRLT() # No design
+	repack = RestrictToRepackingRLT() # No design
 
 	tf = TaskFactory()
 	tf.push_back(OperateOnResidueSubset(prevent, other_set))
-	tf.push_back(OperateOnResidueSubset(restrict, repack_set))
-	# Everything else left designable		
+	tf.push_back(OperateOnResidueSubset(repack, repack_set))
+	# Everything else left designable by default
+
+	# Restricting design further
+	if confine_design:
+		trms = readfile(confine_design)
+		# Converting lines to a dict
+		limited_set = \
+			{int(line.split()[0]):line.split()[1] for line in trms}
+
+		# Converting residues in the dict to a selector
+		res_concatenated = str(limited_set.keys()).strip('[]').replace(' ','')
+		small_des_set = ResidueIndexSelector(res_concatenated)
+		now_only_repack = NotResidueSelector(small_des_set)
+
+		# Making residue selection excluding residues in the file and 
+		# restricting them to repacking
+		no_longer_designable = AndResidueSelector()
+		no_longer_designable.add_residue_selector(design_set)
+		no_longer_designable.add_residue_selector(now_only_repack)
+		tf.push_back(OperateOnResidueSubset(repack, no_longer_designable))
+
+		# Limiting design on residues in the file
+		for res, AAs in limited_set.items():
+			designable_res = ResidueIndexSelector(str(res))
+			restrict_AAs = RestrictAbsentCanonicalAASRLT()
+			restrict_AAs.aas_to_keep(AAs)
+			tf.push_back(OperateOnResidueSubset(restrict_AAs, designable_res))
 
 	return tf
 
@@ -378,6 +440,7 @@ def fastdesign(pose, score_function, movemap, taskfactory):
 
 	fd.apply(pose)
 	return pose
+
 
 ######### Evaluation #########################################################
 # Weights from the score function REF_2015
@@ -539,13 +602,8 @@ class mutation_collection:
 		""" Converts a selector output vector to lists of selected residues """
 		for set_name in self.selectors:
 			selector = self.selectors[set_name]
-			selection_vector = selector.apply(self.threaded_pose)
-
-			selection_list = []
-			for i in range(len(selection_vector)): 
-				if selection_vector[i+1]==1:
-					selection_list.append(i+1)
-
+			selection_list = selector_to_list(self.threaded_pose, selector)
+			
 			setattr(self, set_name + '_residues', selection_list)
 
 	def read_sequence_name(self, name):
@@ -570,7 +628,7 @@ class mutation_collection:
 		self.recognition_sequence = self.sequence[1:7]
 
 
-def set_design(pdb, residue_selectors, num_decoys, method):
+def set_design(pdb, residue_selectors, args):
 	"""
 	Uses the job distributor to output a set of proteases designed for 
 	compatability with a threaded peptide sequence. Outputs a provided number
@@ -587,10 +645,10 @@ def set_design(pdb, residue_selectors, num_decoys, method):
 	ft = make_fold_tree() # Hard-coded for HCV protease
 	pose.fold_tree(ft) # Improve sampling efficiency
 	mm = make_move_map(pose, mc.peptide_residues, mc.movemap_pack_residues)
-	tf = make_task_factory(residue_selectors)
+	tf = make_task_factory(residue_selectors, args.target_res_mutation_file)
 
 	dec_name = pdb.replace('.pdb.gz', '_designed')
-	jd = PyJobDistributor(dec_name, num_decoys, sf)
+	jd = PyJobDistributor(dec_name, args.number_decoys, sf)
 
 	while not jd.job_complete:
 		pp = Pose()
@@ -606,7 +664,7 @@ def set_design(pdb, residue_selectors, num_decoys, method):
 
 		# Doing design, default is FastDesign
 		print 'designing'
-		if method == 'custom':
+		if args.method == 'custom':
 			pp = custom_design(pp, sf, mm, tf, 20)
 		else:
 			pp = fastdesign(pp, sf, mm, tf)		
@@ -615,12 +673,13 @@ def set_design(pdb, residue_selectors, num_decoys, method):
 		relax_res_E_set = res_scores(relaxed_struc, mc.mutable_residues, sf)[1]
 		des_res_E_sum, des_res_E_set = res_scores(pp, mc.mutable_residues, sf)
 		ddg = score_ddg(pp, tf)
+		ddg_change = ddg - score_ddg(relaxed_struc, tf)
 		pro_mut = ident_mutations(pose, pp, mc.mutable_residues, 
 									relax_res_E_set, des_res_E_set)
 
 		# Making line to add to fasc file
-		scores = [des_res_E_sum, ddg, pro_mut]
-		temp = "residue_scores: {}   ddG: {}   mutations: {}"
+		scores = [des_res_E_sum, ddg, ddg_change, pro_mut]
+		temp = "residue_scores: {}   ddG: {}   ddG_change: {}   mutations: {}"
 		score_text = temp.format(*[str(i) for i in scores])
 		print score_text, '\n'
 		jd.additional_decoy_info = score_text
@@ -658,19 +717,8 @@ def main():
 
 	# Doing design on threaded models
 	for struc in t_structs:
-		set_design(struc, residue_selectors, args.number_decoys, args.method)
+		set_design(struc, residue_selectors, args)
 
 
 if __name__ == '__main__':
 	main()
-
-######### Old functions that might be handy outside ##########################
-def selector_to_list(pose, selector):
-	""" Converts a selector output vector to a list of selected residues """
-	selection_vector = selector.apply(pose)
-	selection_list = []
-	for i in range(len(selection_vector)): 
-		if selection_vector[i+1]==1:
-			selection_list.append(i+1)
-
-	return selection_list 

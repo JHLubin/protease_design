@@ -62,7 +62,7 @@ class mutation_collection:
 
 		# Iterating through all decoys extracting relevant info
 		for i in range(self.decoy_count):
-			print '\tanalyzing decoy', i
+			print '\tanalyzing decoy', i + 1
 			self.ident_mutations(self.relaxed_pdbs[i], self.designed_pdbs[i])
 
 		# Getting mutation frequencies, energy averages
