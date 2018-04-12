@@ -29,7 +29,7 @@ def parse_args():
 	info = "Design a protease around a peptide sequence"
 	parser = argparse.ArgumentParser(description=info)
 	parser.add_argument("-s", "--start_struct", required=True,
-		help="Pick starting PDB")
+		default='a_to_s_ly104_WT.pdb', help="Pick starting PDB")
 	parser.add_argument("-od", "--out_dir", required=True,
 		help="Name an output directory for decoys")
 	parser.add_argument("-cseq", "--cut_peptide_sequence", type=str, 
@@ -100,6 +100,8 @@ def get_seq_list(seq_arg):
 			pep_sequences.append(inp.strip())
 
 		for n, s in enumerate(pep_sequences):
+			if len(s) == 5: # Hard code for HCV
+				pep_sequences[n] = 'A' + s + 'CSMHL'
 			if len(s) == 6: # Hard code for HCV
 				pep_sequences[n] = 'A' + s + 'SMHL'
 			else:
@@ -580,6 +582,23 @@ def ident_mutations(start_pose, end_pose, residues, start_set, end_set):
 	else:
 		return "NONE"
 
+
+def read_pose_scores(pose):
+	""" Gets weighted scores for a full pose, returns as list of strings """
+	pose_scores = []
+	energies = pose.energies().total_energies()
+	energies_as_list = [i.strip('( )') for i in str(energies).split(') (')]
+
+	for e in energies_as_list:
+		term, unweighted_val = e.split()
+		term = term.replace(';', '')
+		if term in ref_wts:
+			weighted_val = float(unweighted_val) * ref_wts[term]
+			pose_scores.append(': '.join([term,str(weighted_val)]))
+
+	return pose_scores
+
+
 ######### Design and evaluation protocol #####################################
 class mutation_collection:
 	"""
@@ -670,16 +689,19 @@ def set_design(pdb, residue_selectors, args):
 			pp = fastdesign(pp, sf, mm, tf)		
 
 		# Getting residue scores, ddG, and mutations list
-		relax_res_E_set = res_scores(relaxed_struc, mc.mutable_residues, sf)[1]
+		score_change = sf(pp) - sf(relaxed_struc)
+		relax_res_E_sum, relax_res_E_set = \
+			res_scores(relaxed_struc, mc.mutable_residues, sf)
 		des_res_E_sum, des_res_E_set = res_scores(pp, mc.mutable_residues, sf)
+		res_score_change = des_res_E_sum - relax_res_E_sum
 		ddg = score_ddg(pp, tf)
 		ddg_change = ddg - score_ddg(relaxed_struc, tf)
 		pro_mut = ident_mutations(pose, pp, mc.mutable_residues, 
 									relax_res_E_set, des_res_E_set)
 
 		# Making line to add to fasc file
-		scores = [des_res_E_sum, ddg, ddg_change, pro_mut]
-		temp = "residue_scores: {}   ddG: {}   ddG_change: {}   mutations: {}"
+		scores = [score_change, des_res_E_sum, res_score_change, ddg, ddg_change, pro_mut]
+		temp = "score_change {}   residue_scores: {}   residue_score_change: {}   ddG: {}   ddG_change: {}   mutations: {}"
 		score_text = temp.format(*[str(i) for i in scores])
 		print score_text, '\n'
 		jd.additional_decoy_info = score_text

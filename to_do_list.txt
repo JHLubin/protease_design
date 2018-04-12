@@ -22,9 +22,10 @@ New protocol
 		check database for loops of length X that match end orientations
 	Variable length build option?
 	Mike Tyka, splice mover (Fleishman @ Weitzman Institute)
+	Will's RMSA?
 	Protocol
 		centroid
-			Randomly pick loop siza
+			Randomly pick loop size
 			Find suitable loops in database, splice in
 		full-atom
 			redesign interface with new loop around peptide
@@ -36,6 +37,8 @@ New protocol
 			Inverse rotamer sampling
 			Backbone moved to accommodate the rotamer
 			(Need to figure out which mover does this)
+	Benchmark
+		Recovery of native loops across set
 	Thoughts
 		Assessment of loop  (and full structure) flexibility, since part of loop role is in determining rigidity of the catalytic site, part in attracting the substrate, and part in positioning it
 		XX(for now)Can we share loops across different types of protease, or even with wider PDB?

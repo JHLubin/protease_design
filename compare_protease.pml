@@ -4,7 +4,7 @@ select designed, *designed*
 color cyan, designed
 select protease, chain A and designed
 select peptide, chain B
-select cat_res, res 72+96+154 and designed
+select cat_res, res 72+96+154
 select des_res, res 58+70+138+147+150-153+169-177+183
 select pep_recognition, res 198-203 and designed
 select shell_res, res 51-57+59+69+71+73-75+121+123-124+134-135+137+139+146+148-149+155-156+158+168+178-182 and designed
