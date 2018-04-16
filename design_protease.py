@@ -102,7 +102,7 @@ def get_seq_list(seq_arg):
 		for n, s in enumerate(pep_sequences):
 			if len(s) == 5: # Hard code for HCV
 				pep_sequences[n] = 'A' + s + 'CSMHL'
-			if len(s) == 6: # Hard code for HCV
+			elif len(s) == 6: # Hard code for HCV
 				pep_sequences[n] = 'A' + s + 'SMHL'
 			else:
 				assert len(s) == 11
