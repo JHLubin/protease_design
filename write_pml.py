@@ -55,40 +55,50 @@ def get_mutation_loci_and_results(scores_lines, ind):
 	that mutation at that locus. ind is the index of the score lines where the
 	mutations section begins.
 	"""
-	mutation_loci = {}
-	mutation_results = {}
+	mutation_loci = []
+	mutation_profiles = {}
 	for l in scores_lines:
-		for i in range(2, len(l[ind:]), 4):
-			if l[ind:][i] not in ['NO', '=""']:
-				p = l[0]
-				locus = l[ind:][i-2]
-				mutation = l[ind:][i-1]
+		p = l[0]
+		m_cols = l[ind:]
+		m_prof = ''
+		for i in range(2, len(m_cols), 4):
+			if m_cols[i] not in ['NO', '=""']:
+				locus = m_cols[i-2]
+				mutation = m_cols[i]
+				m_prof += locus + mutation
 				if locus not in mutation_loci: # new locus
-					mutation_loci[locus] = [p]
-					mutation_results[locus] = {mutation:[p]}
-				else: # repeat locus
-					mutation_loci[locus].append(p)
-					if mutation not in mutation_results[locus]: 
-						# new mutation
-						mutation_results[locus][mutation] = [p]
-					else:
-						# repeat mutation
-						mutation_results[locus][mutation].append(p)
+					mutation_loci.append(locus)
 
-	return mutation_loci, mutation_results
+		if m_prof != '':
+			shortname = basename(p).replace('.pdb', '')
+			if m_prof in mutation_profiles:
+				mutation_profiles[m_prof].append(shortname)
+			else:
+				mutation_profiles[m_prof] = [shortname]
+
+	mutation_loci.sort()
+
+	return mutation_loci, mutation_profiles
 
 
-def write_pymol(odir, seq, pdbs, scores, loci, mutations):
+def write_pymol(odir, seq, pdbs, scores, loci, mutants):
 	""" 
 	Writes a PyMOL script to load given relaxed and designed PDB files and 
 	format the view nicely for review of mutations.
 	"""
+	drs = [58, 70, 138, 147, 150, 151, 152, 153, 169, 170, 
+					171, 172, 173, 174, 175, 176, 177, 183]
+	for n, i in enumerate(drs):
+		if i in loci:
+			drs.pop(n)
+
 	cmds = ['delete all']
 	cmds.append('for pdb in ' + str(pdbs) + ': cmd.load(pdb)')
 	cmds.append('select relaxed, *relaxed*')
 	cmds.append('select designed, *designed*')
 	cmds.append('select cat_res, res 72+96+154')
 	cmds.append('select des_res, res ' + '+'.join([str(i) for i in loci]))
+	cmds.append('select contact_res, res ' + '+'.join([str(i) for i in drs]))
 	cmds.append('select peptide, chain B')
 	cmds.append('color green, relaxed')
 	cmds.append('color cyan, designed')
@@ -99,16 +109,25 @@ def write_pymol(odir, seq, pdbs, scores, loci, mutations):
 	cmds.append('hide')
 	cmds.append('show cartoon')
 	cmds.append('show sticks, cat_res')
-	cmds.append('show lines, peptide des_res')
+	cmds.append('show lines, peptide des_res contact_res')
 	cmds.append('set line_width, 3')
 	cmds.append('hide sticks, name C+N+O')
 	cmds.append('hide lines, name C+N+O')
 	cmds.append('hide everything, elem H')
-	cmds.append('label des_res and designed and n. CA, "(%s, %s)" % (resi, resn)')
-	cmds.append('label peptide and designed and n. CA, resn')
+	cmds.append('label (des_res and designed and n. CA), "(%s, %s)" % (resi, resn)')
+	#cmds.append('label (peptide and designed and n. CA), resn')
+
+	for m in mutants:
+		set_p = sorted(mutants[m])
+		l = len(set_p)
+		set_p += [i.replace('design', 'relax') for i in set_p]
+		cmd = 'create ' + m + ', '
+		cmd += set_p[l] + '+((' + '+'.join(set_p) + ') ' 
+		cmd += 'and (des_res+contact_res+peptide))'
+		cmds.append(cmd)
 	#cmds.append()
-	#cmds.append()
-	#cmds.append(set seq_view, 1)
+	#cmds.append('set seq_view, 1')
+	#cmds.append('scene new, store')
 	cmds.append('deselect')
 
 	# Adding line breaks
@@ -151,12 +170,13 @@ def main(folder):
 		scores_lines = get_scoreline(designed, all_scores)
 
 		# Getting list of mutation loci and decoys with mutations at the locus
-		mutation_loci, mutation_results = \
+		m_loci, m_profiles = \
 			get_mutation_loci_and_results(scores_lines, head_len)				
 		
 		# Writing PyMOL script
 		set_pdbs = relaxed + designed
-		write_pymol(folder, s, set_pdbs, scores_lines, mutation_loci, mutation_results)
+		write_pymol(folder, s, set_pdbs, scores_lines, m_loci, m_profiles)
+
 
 if __name__ == '__main__':
 	args = parse_args()
