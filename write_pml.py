@@ -103,11 +103,13 @@ class design_group():
 				decoy = line[0]
 				decoy_number = decoy.split('_')[-1].replace('.pdb', '')
 				if line in lines_to_keep:
-					self.included_pdbs.append(decoy_number)
+					self.included_pdbs.append(int(decoy_number))
 				else:
-					self.excluded_pdbs.append(decoy_number)
+					self.excluded_pdbs.append(int(decoy_number))
 
 			self.scorelines = lines_to_keep
+			self.included_pdbs.sort()
+			self.excluded_pdbs.sort()
 			return
 
 
@@ -153,6 +155,7 @@ def write_pymol(odir, seq, clusters):
 		cmds.append('color cyan, designed')
 		cmds.append('color magenta, cat_res')
 		cmds.append('color yellow, peptide and designed')
+		cmds.append('color yellow, peptide and first_pdb and n. CA+C+N')
 		cmds.append('color purpleblue, des_res and designed')
 		cmds.append('util.cnc')
 
@@ -167,7 +170,7 @@ def write_pymol(odir, seq, clusters):
 
 		# Saving scene
 		cmds.append('deselect')
-		cmds.append('scene new, store')
+		cmds.append('scene ' + c.profile + ', store')
 
 		# Adding report comments for which PDBs are in each set, and which were excluded
 		comments[c.profile] = [c.included_pdbs, c.excluded_pdbs]
